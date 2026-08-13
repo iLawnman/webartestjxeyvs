@@ -11,43 +11,51 @@
                  user-scalable=no"
     >
 
-    <title>AR.js Hiro</title>
+    <title>AR.js Hiro Test</title>
 
     <style>
         html,
         body {
             margin: 0;
             padding: 0;
+
             width: 100%;
             height: 100%;
+
             overflow: hidden;
-            background: #000;
+
+            background: black;
         }
 
         canvas {
             position: fixed;
+
             left: 0;
             top: 0;
+
             width: 100%;
             height: 100%;
         }
 
         #status {
             position: fixed;
-            z-index: 100;
 
-            top: 10px;
+            z-index: 1000;
+
             left: 10px;
+            top: 10px;
 
-            padding: 8px 12px;
+            padding: 10px 14px;
+
+            background: rgba(0, 0, 0, 0.7);
 
             color: white;
-            background: rgba(0, 0, 0, .7);
 
             font-family: Arial, sans-serif;
+
             font-size: 14px;
 
-            border-radius: 4px;
+            border-radius: 5px;
         }
     </style>
 </head>
@@ -55,14 +63,18 @@
 <body>
 
 <div id="status">
-    Starting AR...
+    Loading AR.js...
 </div>
 
-<!-- Three.js -->
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<!--
+    IMPORTANT:
 
-<!-- AR.js -->
-<script src="https://cdn.jsdelivr.net/npm/ar.js@3.4.8/three.js/build/ar.js"></script>
+    Do NOT add another Three.js here.
+
+    AR.js three.js build contains the required
+    Three.js / THREEx integration.
+-->
+<script src="https://raw.githack.com/AR-js-org/AR.js/3.4.8/three.js/build/ar.js"></script>
 
 <script src="ar.js"></script>
 <script src="tree.js"></script>
