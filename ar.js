@@ -1,185 +1,426 @@
-class ARSystem {
+let renderer;
+let scene;
+let camera;
 
-  constructor() {
-    this.renderer = null;
-    this.scene = null;
-    this.camera = null;
+let arSource;
+let arContext;
 
-    this.arSource = null;
-    this.arContext = null;
-    this.markerRoot = null;
-    this.markerControls = null;
+let markerRoot;
 
-    this.initialized = false;
-    this.markerVisible = false;
-  }
+let assetObject = null;
 
-  async init() {
+const statusElement =
+    document.getElementById("status");
 
-    this.scene = new THREE.Scene();
 
-    this.camera = new THREE.Camera();
-    this.scene.add(this.camera);
+function status(text) {
 
-    this.renderer = new THREE.WebGLRenderer({
-      antialias: true,
-      alpha: true
-    });
+    console.log("[AR]", text);
 
-    this.renderer.setPixelRatio(window.devicePixelRatio);
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
-
-    this.renderer.outputEncoding = THREE.sRGBEncoding;
-
-    document.body.appendChild(this.renderer.domElement);
-
-    /*
-     * AR.js camera source
-     */
-    this.arSource = new THREEx.ArToolkitSource({
-      sourceType: 'webcam'
-    });
-
-    await new Promise((resolve) => {
-
-      this.arSource.init(() => {
-
-        this.resize();
-
-        resolve();
-      });
-
-    });
-
-    /*
-     * AR.js context
-     */
-    this.arContext = new THREEx.ArToolkitContext({
-
-      cameraParametersUrl:
-          'https://cdn.jsdelivr.net/npm/ar.js@3.4.7/three.js/data/camera_para.dat',
-
-      detectionMode: 'mono',
-
-      matrixCodeType: '3x3'
-    });
-
-    await new Promise((resolve) => {
-
-      this.arContext.init(() => {
-
-        this.camera.projectionMatrix.copy(
-            this.arContext.getProjectionMatrix()
-        );
-
-        resolve();
-      });
-
-    });
-
-    /*
-     * Marker root
-     */
-    this.markerRoot = new THREE.Group();
-
-    this.scene.add(this.markerRoot);
-
-    /*
-     * Hiro marker
-     */
-    this.markerControls = new THREEx.ArMarkerControls(
-        this.arContext,
-        this.markerRoot,
-        {
-          type: 'pattern',
-          patternUrl: 'hiro.patt',
-
-          changeMatrixMode: 'modelViewMatrix'
-        }
-    );
-
-    this.markerRoot.visible = false;
-
-    window.addEventListener(
-        'resize',
-        () => this.resize()
-    );
-
-    this.initialized = true;
-
-    this.setStatus('Point camera at Hiro marker');
-  }
-
-  resize() {
-
-    if (!this.arSource) {
-      return;
-    }
-
-    this.arSource.onResizeElement();
-
-    this.arSource.copyElementSizeTo(
-        this.renderer.domElement
-    );
-
-    if (this.arContext.arController) {
-
-      this.arSource.copyElementSizeTo(
-          this.arContext.arController.canvas
-      );
-    }
-  }
-
-  update() {
-
-    if (!this.initialized) {
-      return;
-    }
-
-    if (
-        this.arSource &&
-        this.arSource.ready
-    ) {
-      this.arContext.update(
-          this.arSource.domElement
-      );
-    }
-
-    /*
-     * AR.js changes markerRoot.visible.
-     */
-    const visible = this.markerRoot.visible;
-
-    if (visible !== this.markerVisible) {
-
-      this.markerVisible = visible;
-
-      if (visible) {
-        this.setStatus('Hiro detected');
-      } else {
-        this.setStatus('Point camera at Hiro marker');
-      }
-    }
-  }
-
-  render() {
-
-    this.renderer.render(
-        this.scene,
-        this.camera
-    );
-  }
-
-  setStatus(text) {
-
-    const element =
-        document.getElementById('status');
-
-    if (element) {
-      element.textContent = text;
-    }
-  }
+    statusElement.textContent = text;
 }
 
 
-window.AR = new ARSystem();
+/*
+ * --------------------------------------------------
+ * INIT
+ * --------------------------------------------------
+ */
+
+function init() {
+
+    status("Creating Three.js...");
+
+    /*
+     * Scene
+     */
+
+    scene = new THREE.Scene();
+
+
+    /*
+     * Camera
+     */
+
+    camera = new THREE.Camera();
+
+    scene.add(camera);
+
+
+    /*
+     * Renderer
+     */
+
+    renderer =
+        new THREE.WebGLRenderer({
+            antialias: true,
+            alpha: true
+        });
+
+    renderer.setPixelRatio(
+        window.devicePixelRatio
+    );
+
+    renderer.setSize(
+        window.innerWidth,
+        window.innerHeight
+    );
+
+    renderer.domElement.style.position =
+        "fixed";
+
+    renderer.domElement.style.left =
+        "0";
+
+    renderer.domElement.style.top =
+        "0";
+
+    renderer.domElement.style.width =
+        "100%";
+
+    renderer.domElement.style.height =
+        "100%";
+
+    document.body.appendChild(
+        renderer.domElement
+    );
+
+
+    /*
+     * AR Source
+     */
+
+    status("Starting camera...");
+
+    arSource =
+        new THREEx.ArToolkitSource({
+            sourceType: "webcam"
+        });
+
+
+    arSource.init(
+        function () {
+
+            status("Camera started");
+
+            onResize();
+
+        },
+        function (error) {
+
+            console.error(
+                "ARSource error:",
+                error
+            );
+
+            status(
+                "Camera error: " +
+                error
+            );
+        }
+    );
+
+
+    /*
+     * AR Context
+     */
+
+    arContext =
+        new THREEx.ArToolkitContext({
+
+            cameraParametersUrl:
+                "https://cdn.jsdelivr.net/npm/ar.js@3.4.8/three.js/data/camera_para.dat",
+
+            detectionMode: "mono",
+
+            maxDetectionRate: 30,
+
+            canvasWidth: 640,
+
+            canvasHeight: 480
+        });
+
+
+    arContext.init(
+        function () {
+
+            status(
+                "AR context initialized"
+            );
+
+            camera.projectionMatrix.copy(
+                arContext.getProjectionMatrix()
+            );
+
+        }
+    );
+
+
+    /*
+     * Marker
+     */
+
+    markerRoot =
+        new THREE.Group();
+
+    scene.add(markerRoot);
+
+
+    new THREEx.ArMarkerControls(
+        arContext,
+        markerRoot,
+        {
+            type: "pattern",
+
+            patternUrl:
+                "hiro.patt",
+
+            changeMatrixMode:
+                "cameraTransformMatrix"
+        }
+    );
+
+
+    /*
+     * Load asset
+     */
+
+    loadAsset();
+
+
+    /*
+     * Resize
+     */
+
+    window.addEventListener(
+        "resize",
+        onResize
+    );
+
+
+    /*
+     * Loop
+     */
+
+    animate();
+}
+
+
+/*
+ * --------------------------------------------------
+ * ASSET
+ * --------------------------------------------------
+ */
+
+function loadAsset() {
+
+    status("Loading asset.png...");
+
+    const loader =
+        new THREE.TextureLoader();
+
+
+    loader.load(
+
+        "asset.png",
+
+        function (texture) {
+
+            status(
+                "Point camera at Hiro marker"
+            );
+
+
+            texture.minFilter =
+                THREE.LinearFilter;
+
+            texture.magFilter =
+                THREE.LinearFilter;
+
+
+            const material =
+                new THREE.MeshBasicMaterial({
+
+                    map: texture,
+
+                    transparent: true,
+
+                    side: THREE.DoubleSide,
+
+                    depthTest: false,
+
+                    depthWrite: false
+                });
+
+
+            /*
+             * 1 x 1 plane.
+             *
+             * Hiro marker size = 1 unit.
+             */
+
+            const geometry =
+                new THREE.PlaneGeometry(
+                    1,
+                    1
+                );
+
+
+            assetObject =
+                new THREE.Mesh(
+                    geometry,
+                    material
+                );
+
+
+            /*
+             * Slightly above marker.
+             */
+
+            assetObject.position.set(
+                0,
+                0,
+                0.01
+            );
+
+
+            assetObject.rotation.set(
+                0,
+                0,
+                0
+            );
+
+
+            assetObject.renderOrder =
+                100;
+
+
+            markerRoot.add(
+                assetObject
+            );
+
+
+        },
+
+        undefined,
+
+        function (error) {
+
+            console.error(
+                "asset.png loading error:",
+                error
+            );
+
+            status(
+                "ERROR: asset.png not found"
+            );
+        }
+    );
+}
+
+
+/*
+ * --------------------------------------------------
+ * RESIZE
+ * --------------------------------------------------
+ */
+
+function onResize() {
+
+    if (!arSource) {
+        return;
+    }
+
+
+    arSource.onResizeElement();
+
+    arSource.copyElementSizeTo(
+        renderer.domElement
+    );
+
+
+    if (
+        arContext &&
+        arContext.arController
+    ) {
+
+        arSource.copyElementSizeTo(
+            arContext.arController.canvas
+        );
+    }
+}
+
+
+/*
+ * --------------------------------------------------
+ * LOOP
+ * --------------------------------------------------
+ */
+
+function animate() {
+
+    requestAnimationFrame(
+        animate
+    );
+
+
+    if (
+        arSource &&
+        arSource.ready
+    ) {
+
+        arContext.update(
+            arSource.domElement
+        );
+    }
+
+
+    renderer.render(
+        scene,
+        camera
+    );
+
+
+    /*
+     * Debug marker state
+     */
+
+    if (markerRoot) {
+
+        if (markerRoot.visible) {
+
+            statusElement.textContent =
+                "HIRO DETECTED";
+
+        } else {
+
+            statusElement.textContent =
+                "Searching for Hiro...";
+        }
+    }
+}
+
+
+/*
+ * --------------------------------------------------
+ * START
+ * --------------------------------------------------
+ */
+
+try {
+
+    init();
+
+}
+catch (error) {
+
+    console.error(
+        "AR initialization failed:",
+        error
+    );
+
+    status(
+        "AR initialization failed: " +
+        error.message
+    );
+}
