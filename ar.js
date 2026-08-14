@@ -1,4 +1,4 @@
-// s3a ar.js — распознавание маркера → якорь → waitingAnswer → waitImage
+// ar.js — распознавание маркера → якорь → waitingAnswer → waitImage
 
 var arToolkitSource, arToolkitContext, arMarkerControls;
 
@@ -154,11 +154,11 @@ function updateAR() {
 
   if (visible && !markerWasVisible) {
     markerWasVisible = true;
-
-    // Фиксируем якорь в том же кадре, в котором AR.js
-    // впервые сообщил об обнаружении маркера.
-    // После этого worldAnchor не связан с markerRoot.
-    goToWaitingAnswer();
+    setTimeout(function () {
+      if (appState === 'search' && markerRoot.visible) {
+        goToWaitingAnswer();
+      }
+    }, 120);
   }
 
   if (!visible) {
