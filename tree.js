@@ -34,6 +34,7 @@ function initThree() {
   document.body.appendChild(renderer.domElement);
 
   markerRoot = new THREE.Group();
+  markerRoot.matrixAutoUpdate = false;
   scene.add(markerRoot);
   markerRoot.visible = false;
 
@@ -151,7 +152,7 @@ function buildArTargetUI() {
   assetMesh.rotation.z = -0.15;
   arTarget.add(assetMesh);
 
-  // КНОПКИ (низ)
+  // КНОПКА (низ)
   var btnTex = makeTextTexture('кнопка', {
     w: 512, h: 200, fontSize: 48, fg: '#e11d48', bg: '#ffffff'
   });
@@ -163,37 +164,44 @@ function buildArTargetUI() {
   return arTarget;
 }
 
+/**
+ * Фиксация позы:
+ * 1) UI на markerRoot
+ * 2) scene.attach() — в scene с сохранением мировой матрицы
+ */
 function createAnchorFromMarker() {
-  if (worldAnchor) {
-    scene.remove(worldAnchor);
-    worldAnchor = null;
+  if (arTarget) {
+    if (arTarget.parent) arTarget.parent.remove(arTarget);
     arTarget = null;
-    assetMesh = null;
-    buttonMesh = null;
-    helpMesh = null;
-    questionMesh = null;
   }
-
-  markerRoot.updateMatrixWorld(true);
-  worldAnchor = new THREE.Group();
-  worldAnchor.matrix.copy(markerRoot.matrixWorld);
-  worldAnchor.matrix.decompose(
-    worldAnchor.position,
-    worldAnchor.quaternion,
-    worldAnchor.scale
-  );
-  worldAnchor.matrixAutoUpdate = true;
-  scene.add(worldAnchor);
+  if (worldAnchor) {
+    if (worldAnchor.parent) worldAnchor.parent.remove(worldAnchor);
+    worldAnchor = null;
+  }
+  assetMesh = null;
+  buttonMesh = null;
+  helpMesh = null;
+  questionMesh = null;
 
   buildArTargetUI();
-  worldAnchor.add(arTarget);
+
+  markerRoot.visible = true;
+  markerRoot.add(arTarget);
+
+  markerRoot.updateMatrixWorld(true);
+  arTarget.updateMatrixWorld(true);
+
+  // Ключ: сохраняем world pose при переносе в scene
+  scene.attach(arTarget);
+
+  worldAnchor = arTarget;
+  markerRoot.visible = false;
 
   return worldAnchor;
 }
 
 function hideArTarget() {
   if (arTarget) arTarget.visible = false;
-  if (worldAnchor) worldAnchor.visible = false;
 }
 
 function onPointerDown(event) {
