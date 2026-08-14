@@ -1,4 +1,4 @@
-// ar.js — search → якорь + UI-макет → waitingAnswer → waitImage
+// ar.js — search → waitingAnswer (smooth) → waitImage
 
 var arToolkitSource, arToolkitContext, arMarkerControls;
 
@@ -41,20 +41,16 @@ function updateFps() {
 
 function goToWaitingAnswer() {
   if (appState !== 'search') return;
-
   createAnchorFromMarker();
   appState = 'waitingAnswer';
-
   setStatus('ждём ответ', 'search', 'нажми кнопку', 'ok');
   console.log('[AR] state → waitingAnswer');
 }
 
 function goToWaitImage() {
   if (appState !== 'waitingAnswer') return;
-
   hideArTarget();
   appState = 'waitImage';
-
   setStatus('waitImage', 'ok', 'готово', 'ok');
   console.log('[AR] state → waitImage');
 }
@@ -78,16 +74,13 @@ function initAR() {
       video.style.cssText =
         'position:fixed!important;top:0!important;left:0!important;width:100%!important;height:100%!important;object-fit:cover!important;z-index:0!important;';
     }
-
     onResizeAR();
     hideLoader();
     setStatus('поиск', 'search', 'наведи на Hiro', 'search');
     appState = 'search';
   });
 
-  setTimeout(function () {
-    hideLoader();
-  }, 4000);
+  setTimeout(hideLoader, 4000);
 
   window.addEventListener('resize', function () {
     onResizeAR();
@@ -137,9 +130,13 @@ function updateAR() {
 
   arToolkitContext.update(arToolkitSource.domElement);
 
-  if (appState !== 'search') return;
-
   var visible = markerRoot.visible === true;
+
+  if (appState === 'waitingAnswer' && visible) {
+    syncSmooth(false);
+  }
+
+  if (appState !== 'search') return;
 
   if (visible && !markerWasVisible) {
     markerWasVisible = true;
@@ -150,9 +147,7 @@ function updateAR() {
     }, 120);
   }
 
-  if (!visible) {
-    markerWasVisible = false;
-  }
+  if (!visible) markerWasVisible = false;
 }
 
 initThree();
