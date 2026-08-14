@@ -1,11 +1,7 @@
-// ar.js — распознавание маркера → якорь → waitingAnswer → waitImage
+// ar.js — AR.js: источник, контекст, маркер Hiro + статус
 
 var arToolkitSource, arToolkitContext, arMarkerControls;
-
-// Состояния: search | waitingAnswer | waitImage
-var appState = 'search';
-var markerWasVisible = false;
-
+var markerVisible = false;
 var lastTime = performance.now();
 var frames = 0;
 var fps = 0;
@@ -23,20 +19,6 @@ function setStatus(arText, arClass, markerText, markerClass) {
   }
 }
 
-function setStateLabel(text, cls) {
-  setStatus(
-    appState === 'search' ? 'поиск' : (appState === 'waitingAnswer' ? 'ждём ответ' : 'waitImage'),
-    appState === 'waitImage' ? 'ok' : 'search',
-    text,
-    cls || ''
-  );
-}
-
-function hideLoader() {
-  var loader = document.getElementById('loader');
-  if (loader) loader.style.display = 'none';
-}
-
 function updateFps() {
   frames++;
   var now = performance.now();
@@ -49,34 +31,7 @@ function updateFps() {
   }
 }
 
-function goToWaitingAnswer() {
-  if (appState !== 'search') return;
-
-  createAnchorFromMarker();
-  appState = 'waitingAnswer';
-
-  setStatus('ждём ответ', 'search', 'нажми на картинку', 'ok');
-  console.log('[AR] state → waitingAnswer (якорь зафиксирован)');
-}
-
-function goToWaitImage() {
-  if (appState !== 'waitingAnswer') return;
-
-  hideArTarget();
-  appState = 'waitImage';
-
-  setStatus('waitImage', 'ok', 'готово', 'ok');
-  console.log('[AR] state → waitImage');
-}
-
-/** Вызывается из tree.js при клике по asset.png */
-function onArTargetClicked() {
-  goToWaitImage();
-}
-
 function initAR() {
-  setStatus('инициализация…', 'search', '—', '');
-
   arToolkitSource = new THREEx.ArToolkitSource({
     sourceType: 'webcam',
     sourceWidth: window.innerWidth > window.innerHeight ? 1280 : 720,
@@ -84,21 +39,23 @@ function initAR() {
   });
 
   arToolkitSource.init(function onReady() {
+    // Делаем видео на весь экран
     var video = arToolkitSource.domElement;
     if (video) {
-      video.style.cssText =
-        'position:fixed!important;top:0!important;left:0!important;width:100%!important;height:100%!important;object-fit:cover!important;z-index:0!important;';
+      video.style.position = 'fixed';
+      video.style.top = '0';
+      video.style.left = '0';
+      video.style.width = '100%';
+      video.style.height = '100%';
+      video.style.objectFit = 'cover';
+      video.style.zIndex = '0';
     }
 
     onResizeAR();
-    hideLoader();
-    setStatus('поиск', 'search', 'наведи на Hiro', 'search');
-    appState = 'search';
+    var loader = document.getElementById('loader');
+    if (loader) loader.style.display = 'none';
+    setStatus('активен', 'ok', 'ищу…', 'search');
   });
-
-  setTimeout(function () {
-    hideLoader();
-  }, 4000);
 
   window.addEventListener('resize', function () {
     onResizeAR();
@@ -117,29 +74,28 @@ function initAR() {
     camera.projectionMatrix.copy(arToolkitContext.getProjectionMatrix());
   });
 
+  // Маркер Hiro
   arMarkerControls = new THREEx.ArMarkerControls(arToolkitContext, markerRoot, {
     type: 'pattern',
     patternUrl: 'hiro.patt',
     changeMatrixMode: 'modelViewMatrix'
   });
-
-  markerRoot.visible = false;
 }
 
 function onResizeAR() {
   if (!arToolkitSource) return;
-  try {
-    arToolkitSource.onResizeElement();
-    arToolkitSource.copyElementSizeTo(renderer.domElement);
-    if (arToolkitContext && arToolkitContext.arController !== null) {
-      arToolkitSource.copyElementSizeTo(arToolkitContext.arController.canvas);
-    }
-  } catch (e) {}
+  arToolkitSource.onResizeElement();
+  arToolkitSource.copyElementSizeTo(renderer.domElement);
+  if (arToolkitContext && arToolkitContext.arController !== null) {
+    arToolkitSource.copyElementSizeTo(arToolkitContext.arController.canvas);
+  }
 
+  // Ещё раз принудительно растягиваем видео
   var video = arToolkitSource.domElement;
   if (video) {
-    video.style.cssText =
-      'position:fixed!important;top:0!important;left:0!important;width:100%!important;height:100%!important;object-fit:cover!important;z-index:0!important;';
+    video.style.width = '100%';
+    video.style.height = '100%';
+    video.style.objectFit = 'cover';
   }
 }
 
@@ -148,21 +104,15 @@ function updateAR() {
 
   arToolkitContext.update(arToolkitSource.domElement);
 
-  if (appState !== 'search') return;
-
-  var visible = markerRoot.visible === true;
-
-  if (visible && !markerWasVisible) {
-    markerWasVisible = true;
-    setTimeout(function () {
-      if (appState === 'search' && markerRoot.visible) {
-        goToWaitingAnswer();
-      }
-    }, 120);
-  }
-
-  if (!visible) {
-    markerWasVisible = false;
+  // Проверяем видимость маркера
+  var visible = markerRoot.visible;
+  if (visible !== markerVisible) {
+    markerVisible = visible;
+    if (markerVisible) {
+      setStatus('активен', 'ok', 'найден ✓', 'ok');
+    } else {
+      setStatus('активен', 'ok', 'ищу…', 'search');
+    }
   }
 }
 
