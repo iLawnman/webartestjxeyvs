@@ -2,6 +2,7 @@
 
 var arToolkitSource, arToolkitContext, arMarkerControls;
 var markerVisible = false;
+var arReady = false;
 var lastTime = performance.now();
 var frames = 0;
 var fps = 0;
@@ -19,6 +20,11 @@ function setStatus(arText, arClass, markerText, markerClass) {
   }
 }
 
+function hideLoader() {
+  var loader = document.getElementById('loader');
+  if (loader) loader.style.display = 'none';
+}
+
 function updateFps() {
   frames++;
   var now = performance.now();
@@ -32,6 +38,8 @@ function updateFps() {
 }
 
 function initAR() {
+  setStatus('инициализация…', 'search', '—', '');
+
   arToolkitSource = new THREEx.ArToolkitSource({
     sourceType: 'webcam',
     sourceWidth: window.innerWidth > window.innerHeight ? 1280 : 720,
@@ -39,23 +47,24 @@ function initAR() {
   });
 
   arToolkitSource.init(function onReady() {
-    // Делаем видео на весь экран
     var video = arToolkitSource.domElement;
     if (video) {
-      video.style.position = 'fixed';
-      video.style.top = '0';
-      video.style.left = '0';
-      video.style.width = '100%';
-      video.style.height = '100%';
-      video.style.objectFit = 'cover';
-      video.style.zIndex = '0';
+      video.style.cssText = 'position:fixed!important;top:0!important;left:0!important;width:100%!important;height:100%!important;object-fit:cover!important;z-index:0!important;';
     }
 
     onResizeAR();
-    var loader = document.getElementById('loader');
-    if (loader) loader.style.display = 'none';
+    hideLoader();
+    arReady = true;
     setStatus('активен', 'ok', 'ищу…', 'search');
   });
+
+  // Фолбэк, если колбэк не сработал
+  setTimeout(function () {
+    hideLoader();
+    if (!arReady) {
+      setStatus('камера?', 'search', 'ожидание…', 'search');
+    }
+  }, 4000);
 
   window.addEventListener('resize', function () {
     onResizeAR();
@@ -74,28 +83,28 @@ function initAR() {
     camera.projectionMatrix.copy(arToolkitContext.getProjectionMatrix());
   });
 
-  // Маркер Hiro
   arMarkerControls = new THREEx.ArMarkerControls(arToolkitContext, markerRoot, {
     type: 'pattern',
     patternUrl: 'hiro.patt',
     changeMatrixMode: 'modelViewMatrix'
   });
+
+  markerRoot.visible = false;
 }
 
 function onResizeAR() {
   if (!arToolkitSource) return;
-  arToolkitSource.onResizeElement();
-  arToolkitSource.copyElementSizeTo(renderer.domElement);
-  if (arToolkitContext && arToolkitContext.arController !== null) {
-    arToolkitSource.copyElementSizeTo(arToolkitContext.arController.canvas);
-  }
+  try {
+    arToolkitSource.onResizeElement();
+    arToolkitSource.copyElementSizeTo(renderer.domElement);
+    if (arToolkitContext && arToolkitContext.arController !== null) {
+      arToolkitSource.copyElementSizeTo(arToolkitContext.arController.canvas);
+    }
+  } catch (e) {}
 
-  // Ещё раз принудительно растягиваем видео
   var video = arToolkitSource.domElement;
   if (video) {
-    video.style.width = '100%';
-    video.style.height = '100%';
-    video.style.objectFit = 'cover';
+    video.style.cssText = 'position:fixed!important;top:0!important;left:0!important;width:100%!important;height:100%!important;object-fit:cover!important;z-index:0!important;';
   }
 }
 
@@ -104,8 +113,8 @@ function updateAR() {
 
   arToolkitContext.update(arToolkitSource.domElement);
 
-  // Проверяем видимость маркера
-  var visible = markerRoot.visible;
+  var visible = markerRoot.visible === true;
+
   if (visible !== markerVisible) {
     markerVisible = visible;
     if (markerVisible) {
