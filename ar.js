@@ -1,8 +1,7 @@
-// ar.js — распознавание маркера → якорь → waitingAnswer → waitImage
+// ar.js — search → якорь + UI-макет → waitingAnswer → waitImage
 
 var arToolkitSource, arToolkitContext, arMarkerControls;
 
-// Состояния: search | waitingAnswer | waitImage
 var appState = 'search';
 var markerWasVisible = false;
 
@@ -21,15 +20,6 @@ function setStatus(arText, arClass, markerText, markerClass) {
     elMarker.textContent = markerText;
     elMarker.className = 'value ' + (markerClass || '');
   }
-}
-
-function setStateLabel(text, cls) {
-  setStatus(
-    appState === 'search' ? 'поиск' : (appState === 'waitingAnswer' ? 'ждём ответ' : 'waitImage'),
-    appState === 'waitImage' ? 'ok' : 'search',
-    text,
-    cls || ''
-  );
 }
 
 function hideLoader() {
@@ -55,8 +45,8 @@ function goToWaitingAnswer() {
   createAnchorFromMarker();
   appState = 'waitingAnswer';
 
-  setStatus('ждём ответ', 'search', 'нажми на картинку', 'ok');
-  console.log('[AR] state → waitingAnswer (якорь зафиксирован)');
+  setStatus('ждём ответ', 'search', 'нажми кнопку', 'ok');
+  console.log('[AR] state → waitingAnswer');
 }
 
 function goToWaitImage() {
@@ -69,7 +59,6 @@ function goToWaitImage() {
   console.log('[AR] state → waitImage');
 }
 
-/** Вызывается из tree.js при клике по asset.png */
 function onArTargetClicked() {
   goToWaitImage();
 }
@@ -166,7 +155,6 @@ function updateAR() {
   }
 }
 
-// ===== Запуск =====
 initThree();
 initAR();
 
