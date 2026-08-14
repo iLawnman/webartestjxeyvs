@@ -1,4 +1,4 @@
-// S3A ar.js — распознавание маркера → якорь → waitingAnswer → waitImage
+// s3a ar.js — распознавание маркера → якорь → waitingAnswer → waitImage
 
 var arToolkitSource, arToolkitContext, arMarkerControls;
 
@@ -83,10 +83,7 @@ function initAR() {
     sourceHeight: window.innerWidth > window.innerHeight ? 720 : 1280
   });
 
-  console.log('[AR] camera initialization started');
-
   arToolkitSource.init(function onReady() {
-    console.log('[AR] camera ready');
     var video = arToolkitSource.domElement;
     if (video) {
       video.style.cssText =
@@ -100,12 +97,8 @@ function initAR() {
   });
 
   setTimeout(function () {
-    var loader = document.getElementById('loader');
-    if (loader && loader.style.display !== 'none') {
-      loader.textContent = 'Камера не инициализирована. Разрешите доступ к камере и перезагрузите страницу.';
-      console.error('[AR] camera initialization timeout');
-    }
-  }, 8000);
+    hideLoader();
+  }, 4000);
 
   window.addEventListener('resize', function () {
     onResizeAR();
@@ -162,8 +155,9 @@ function updateAR() {
   if (visible && !markerWasVisible) {
     markerWasVisible = true;
 
-    // Capture the marker transform in the same frame in which AR.js
-    // reports it. worldAnchor is then independent from markerRoot.
+    // Фиксируем якорь в том же кадре, в котором AR.js
+    // впервые сообщил об обнаружении маркера.
+    // После этого worldAnchor не связан с markerRoot.
     goToWaitingAnswer();
   }
 
