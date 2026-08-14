@@ -1,8 +1,11 @@
-// ar.js — AR.js: источник, контекст, маркер Hiro + статус
+// ar.js — распознавание маркера → якорь → waitingAnswer → waitImage
 
 var arToolkitSource, arToolkitContext, arMarkerControls;
-var markerVisible = false;
-var arReady = false;
+
+// Состояния: search | waitingAnswer | waitImage
+var appState = 'search';
+var markerWasVisible = false;
+
 var lastTime = performance.now();
 var frames = 0;
 var fps = 0;
@@ -18,6 +21,15 @@ function setStatus(arText, arClass, markerText, markerClass) {
     elMarker.textContent = markerText;
     elMarker.className = 'value ' + (markerClass || '');
   }
+}
+
+function setStateLabel(text, cls) {
+  setStatus(
+    appState === 'search' ? 'поиск' : (appState === 'waitingAnswer' ? 'ждём ответ' : 'waitImage'),
+    appState === 'waitImage' ? 'ok' : 'search',
+    text,
+    cls || ''
+  );
 }
 
 function hideLoader() {
@@ -37,6 +49,31 @@ function updateFps() {
   }
 }
 
+function goToWaitingAnswer() {
+  if (appState !== 'search') return;
+
+  createAnchorFromMarker();
+  appState = 'waitingAnswer';
+
+  setStatus('ждём ответ', 'search', 'нажми на картинку', 'ok');
+  console.log('[AR] state → waitingAnswer (якорь зафиксирован)');
+}
+
+function goToWaitImage() {
+  if (appState !== 'waitingAnswer') return;
+
+  hideArTarget();
+  appState = 'waitImage';
+
+  setStatus('waitImage', 'ok', 'готово', 'ok');
+  console.log('[AR] state → waitImage');
+}
+
+/** Вызывается из tree.js при клике по asset.png */
+function onArTargetClicked() {
+  goToWaitImage();
+}
+
 function initAR() {
   setStatus('инициализация…', 'search', '—', '');
 
@@ -49,21 +86,18 @@ function initAR() {
   arToolkitSource.init(function onReady() {
     var video = arToolkitSource.domElement;
     if (video) {
-      video.style.cssText = 'position:fixed!important;top:0!important;left:0!important;width:100%!important;height:100%!important;object-fit:cover!important;z-index:0!important;';
+      video.style.cssText =
+        'position:fixed!important;top:0!important;left:0!important;width:100%!important;height:100%!important;object-fit:cover!important;z-index:0!important;';
     }
 
     onResizeAR();
     hideLoader();
-    arReady = true;
-    setStatus('активен', 'ok', 'ищу…', 'search');
+    setStatus('поиск', 'search', 'наведи на Hiro', 'search');
+    appState = 'search';
   });
 
-  // Фолбэк, если колбэк не сработал
   setTimeout(function () {
     hideLoader();
-    if (!arReady) {
-      setStatus('камера?', 'search', 'ожидание…', 'search');
-    }
   }, 4000);
 
   window.addEventListener('resize', function () {
@@ -104,7 +138,8 @@ function onResizeAR() {
 
   var video = arToolkitSource.domElement;
   if (video) {
-    video.style.cssText = 'position:fixed!important;top:0!important;left:0!important;width:100%!important;height:100%!important;object-fit:cover!important;z-index:0!important;';
+    video.style.cssText =
+      'position:fixed!important;top:0!important;left:0!important;width:100%!important;height:100%!important;object-fit:cover!important;z-index:0!important;';
   }
 }
 
@@ -113,15 +148,21 @@ function updateAR() {
 
   arToolkitContext.update(arToolkitSource.domElement);
 
+  if (appState !== 'search') return;
+
   var visible = markerRoot.visible === true;
 
-  if (visible !== markerVisible) {
-    markerVisible = visible;
-    if (markerVisible) {
-      setStatus('активен', 'ok', 'найден ✓', 'ok');
-    } else {
-      setStatus('активен', 'ok', 'ищу…', 'search');
-    }
+  if (visible && !markerWasVisible) {
+    markerWasVisible = true;
+    setTimeout(function () {
+      if (appState === 'search' && markerRoot.visible) {
+        goToWaitingAnswer();
+      }
+    }, 120);
+  }
+
+  if (!visible) {
+    markerWasVisible = false;
   }
 }
 
