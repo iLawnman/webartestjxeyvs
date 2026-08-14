@@ -1,4 +1,4 @@
-// S3A tree.js — сцена, рендерер, якорь, arTarget
+//s3b  tree.js — сцена, рендерер, якорь, arTarget
 
 var scene, camera, renderer;
 var markerRoot;          // только для чтения позиции маркера
@@ -105,28 +105,21 @@ function hideArTarget() {
 
 function onPointerDown(event) {
   if (typeof appState === 'undefined' || appState !== 'waitingAnswer') return;
-  if (!renderer || !camera || !assetMesh || !arTarget || !arTarget.visible) return;
-  if (!worldAnchor || !worldAnchor.visible) return;
+  if (!assetMesh || !arTarget || !arTarget.visible) return;
 
   var rect = renderer.domElement.getBoundingClientRect();
-  if (!rect.width || !rect.height) return;
+  var x = (event.clientX - rect.left) / rect.width;
+  var y = (event.clientY - rect.top) / rect.height;
 
-  pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-  pointer.y = -(((event.clientY - rect.top) / rect.height) * 2 - 1);
-
-  camera.updateMatrixWorld(true);
-  worldAnchor.updateMatrixWorld(true);
-  assetMesh.updateMatrixWorld(true);
+  pointer.x = x * 2 - 1;
+  pointer.y = -(y * 2 - 1);
 
   raycaster.setFromCamera(pointer, camera);
+  var hits = raycaster.intersectObject(assetMesh, false);
 
-  var hits = raycaster.intersectObjects([arTarget], true);
-
-  for (var i = 0; i < hits.length; i++) {
-    if (hits[i].object === assetMesh || hits[i].object.name === 'arTargetHit') {
-      console.log('[AR] arTarget clicked');
-      if (typeof onArTargetClicked === 'function') onArTargetClicked();
-      return;
+  if (hits.length > 0) {
+    if (typeof onArTargetClicked === 'function') {
+      onArTargetClicked();
     }
   }
 }
