@@ -1,4 +1,4 @@
-// tree.js — сцена, рендерер, якорь, arTarget
+ь, arTarget
 
 var scene, camera, renderer;
 var markerRoot;          // только для чтения позиции маркера
