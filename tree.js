@@ -5,23 +5,24 @@ var markerRoot;
 var assetMesh;
 
 function initThree() {
-  // Сцена
   scene = new THREE.Scene();
 
-  // Камера (управляется AR)
   camera = new THREE.Camera();
   scene.add(camera);
 
-  // Рендерер
   renderer = new THREE.WebGLRenderer({
     antialias: true,
     alpha: true
   });
-  renderer.setClearColor(new THREE.Color('lightgrey'), 0);
+  renderer.setClearColor(new THREE.Color(0x000000), 0);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.domElement.style.position = 'absolute';
-  renderer.domElement.style.top = '0px';
-  renderer.domElement.style.left = '0px';
+  renderer.domElement.style.position = 'fixed';
+  renderer.domElement.style.top = '0';
+  renderer.domElement.style.left = '0';
+  renderer.domElement.style.width = '100%';
+  renderer.domElement.style.height = '100%';
+  renderer.domElement.style.zIndex = '1';
   document.body.appendChild(renderer.domElement);
 
   // Группа маркера
@@ -38,10 +39,9 @@ function initThree() {
   });
 
   assetMesh = new THREE.Mesh(geometry, material);
-  assetMesh.rotation.x = -Math.PI / 2; // лежать плашмя на маркере
+  assetMesh.rotation.x = -Math.PI / 2;
   markerRoot.add(assetMesh);
 
-  // Свет
   var light = new THREE.AmbientLight(0xffffff, 1);
   scene.add(light);
 
