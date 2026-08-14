@@ -1,8 +1,8 @@
-// tree.js — сцена, рендерер, якорь, arTarget (макет: help | вопрос | картинка + кнопки)
+// tree.js — arTarget на маркере через сглаженный smoothRoot
 
 var scene, camera, renderer;
 var markerRoot;
-var worldAnchor = null;
+var smoothRoot = null;
 var arTarget = null;
 var assetMesh = null;
 var buttonMesh = null;
@@ -11,6 +11,15 @@ var questionMesh = null;
 
 var raycaster = new THREE.Raycaster();
 var pointer = new THREE.Vector2();
+
+var SMOOTH = 0.18;
+var _pos = new THREE.Vector3();
+var _quat = new THREE.Quaternion();
+var _scale = new THREE.Vector3();
+var _posS = new THREE.Vector3();
+var _quatS = new THREE.Quaternion();
+var _scaleS = new THREE.Vector3(1, 1, 1);
+var smoothReady = false;
 
 function initThree() {
   scene = new THREE.Scene();
@@ -38,6 +47,10 @@ function initThree() {
   scene.add(markerRoot);
   markerRoot.visible = false;
 
+  smoothRoot = new THREE.Group();
+  scene.add(smoothRoot);
+  smoothRoot.visible = false;
+
   var light = new THREE.AmbientLight(0xffffff, 1);
   scene.add(light);
 
@@ -46,9 +59,7 @@ function initThree() {
 }
 
 function onResize() {
-  if (renderer) {
-    renderer.setSize(window.innerWidth, window.innerHeight);
-  }
+  if (renderer) renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
 function render() {
@@ -125,7 +136,6 @@ function buildArTargetUI() {
   var btnW = 0.7;
   var btnH = 0.22;
 
-  // HELP (лево)
   var helpTex = makeTextTexture('help', {
     w: 512, h: 512, fontSize: 64, fg: '#e11d48', bg: '#ffffff'
   });
@@ -135,7 +145,6 @@ function buildArTargetUI() {
   helpMesh.rotation.z = 0.15;
   arTarget.add(helpMesh);
 
-  // ВОПРОС (центр)
   var qTex = makeTextTexture('вопрос или\nвариант\nответа', {
     w: 512, h: 512, fontSize: 40, fg: '#e11d48', bg: '#ffffff'
   });
@@ -144,7 +153,6 @@ function buildArTargetUI() {
   questionMesh.rotation.x = -Math.PI / 2;
   arTarget.add(questionMesh);
 
-  // КАРТИНКА = asset.png (право)
   var assetTex = new THREE.TextureLoader().load('asset.png');
   assetMesh = makePanel(panelW, panelH, assetTex, 'arTargetHit');
   assetMesh.position.set(panelW + gap, 0.02, 0);
@@ -152,7 +160,6 @@ function buildArTargetUI() {
   assetMesh.rotation.z = -0.15;
   arTarget.add(assetMesh);
 
-  // КНОПКА (низ)
   var btnTex = makeTextTexture('кнопка', {
     w: 512, h: 200, fontSize: 48, fg: '#e11d48', bg: '#ffffff'
   });
@@ -164,44 +171,47 @@ function buildArTargetUI() {
   return arTarget;
 }
 
-/**
- * Фиксация позы:
- * 1) UI на markerRoot
- * 2) scene.attach() — в scene с сохранением мировой матрицы
- */
 function createAnchorFromMarker() {
-  if (arTarget) {
-    if (arTarget.parent) arTarget.parent.remove(arTarget);
-    arTarget = null;
-  }
-  if (worldAnchor) {
-    if (worldAnchor.parent) worldAnchor.parent.remove(worldAnchor);
-    worldAnchor = null;
-  }
+  if (arTarget && arTarget.parent) arTarget.parent.remove(arTarget);
+  arTarget = null;
   assetMesh = null;
   buttonMesh = null;
   helpMesh = null;
   questionMesh = null;
+  smoothReady = false;
 
   buildArTargetUI();
-
-  markerRoot.visible = true;
-  markerRoot.add(arTarget);
-
-  markerRoot.updateMatrixWorld(true);
-  arTarget.updateMatrixWorld(true);
-
-  // Ключ: сохраняем world pose при переносе в scene
-  scene.attach(arTarget);
-
-  worldAnchor = arTarget;
-  markerRoot.visible = false;
-
-  return worldAnchor;
+  smoothRoot.add(arTarget);
+  smoothRoot.visible = true;
+  syncSmooth(true);
+  return smoothRoot;
 }
 
 function hideArTarget() {
   if (arTarget) arTarget.visible = false;
+  if (smoothRoot) smoothRoot.visible = false;
+}
+
+function syncSmooth(immediate) {
+  if (!markerRoot || !smoothRoot) return;
+
+  markerRoot.matrix.decompose(_pos, _quat, _scale);
+
+  if (immediate || !smoothReady) {
+    _posS.copy(_pos);
+    _quatS.copy(_quat);
+    _scaleS.copy(_scale);
+    smoothReady = true;
+  } else {
+    _posS.lerp(_pos, SMOOTH);
+    _quatS.slerp(_quat, SMOOTH);
+    _scaleS.lerp(_scale, SMOOTH);
+  }
+
+  smoothRoot.position.copy(_posS);
+  smoothRoot.quaternion.copy(_quatS);
+  smoothRoot.scale.copy(_scaleS);
+  smoothRoot.updateMatrixWorld(true);
 }
 
 function onPointerDown(event) {
@@ -222,9 +232,7 @@ function onPointerDown(event) {
   if (assetMesh) targets.push(assetMesh);
 
   var hits = raycaster.intersectObjects(targets, false);
-  if (hits.length > 0) {
-    if (typeof onArTargetClicked === 'function') {
-      onArTargetClicked();
-    }
+  if (hits.length > 0 && typeof onArTargetClicked === 'function') {
+    onArTargetClicked();
   }
 }
