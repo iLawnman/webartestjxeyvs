@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+
   <meta
           name="viewport"
           content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
@@ -14,86 +15,141 @@
     body {
       margin: 0;
       padding: 0;
+
       width: 100%;
       height: 100%;
+
       overflow: hidden;
-      background: #111;
-      font-family: monospace;
+
+      background: #050505;
+
+      font-family:
+              ui-monospace,
+              SFMono-Regular,
+              Menlo,
+              Monaco,
+              Consolas,
+              monospace;
     }
 
     canvas {
       display: block;
     }
 
-    #ui {
+    #debug {
       position: fixed;
+
       top: 0;
       left: 0;
-      right: 0;
 
-      max-height: 55vh;
+      width: min(620px, 100vw);
+      max-height: 72vh;
+
+      box-sizing: border-box;
+
+      padding: 12px 14px;
+
       overflow: auto;
 
-      padding: 10px;
-
-      color: #d8ffd8;
+      color: #b9ffb9;
       background: rgba(0, 0, 0, 0.78);
 
+      border-right: 1px solid rgba(255,255,255,0.12);
+      border-bottom: 1px solid rgba(255,255,255,0.12);
+
       font-size: 11px;
-      line-height: 1.35;
+      line-height: 1.45;
+
+      z-index: 1000;
 
       pointer-events: none;
 
-      z-index: 1000;
+      white-space: normal;
     }
 
-    #ui .title {
-      color: white;
-      font-size: 14px;
-      font-weight: bold;
-      margin-bottom: 6px;
+    #debug .title {
+      margin-bottom: 8px;
+
+      color: #ffffff;
+
+      font-size: 15px;
+      font-weight: 700;
     }
 
-    #ui .section {
-      color: #fff;
-      margin-top: 7px;
-      border-bottom: 1px solid rgba(255,255,255,0.15);
+    #debug .section {
+      margin-top: 9px;
+      margin-bottom: 3px;
+
       padding-bottom: 2px;
+
+      color: #ffffff;
+
+      border-bottom: 1px solid rgba(255,255,255,0.15);
+
+      font-weight: 700;
     }
 
-    #ui .warning {
-      color: #ffd080;
-    }
-
-    #ui .error {
-      color: #ff8080;
-    }
-
-    #ui .ok {
+    #debug .ok {
       color: #80ff80;
     }
 
-    #jsonButton {
+    #debug .warning {
+      color: #ffd080;
+    }
+
+    #debug .error {
+      color: #ff8080;
+    }
+
+    #debug .plane {
+      margin-top: 7px;
+      padding: 6px;
+
+      background: rgba(255,255,255,0.04);
+
+      border-left: 2px solid rgba(255,255,255,0.25);
+    }
+
+    #debug .floor {
+      border-left-color: #00ff00;
+    }
+
+    #debug .wall {
+      border-left-color: #0088ff;
+    }
+
+    #debug .other {
+      border-left-color: #ffff00;
+    }
+
+    #buttons {
       position: fixed;
 
       right: 10px;
       bottom: 10px;
 
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+
       z-index: 2000;
+    }
 
-      padding: 10px 14px;
+    button {
+      padding: 9px 12px;
 
-      border: 1px solid rgba(255,255,255,0.3);
-      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 5px;
 
       color: white;
+
       background: rgba(0,0,0,0.75);
 
       font-family: monospace;
-      font-size: 12px;
+      font-size: 11px;
     }
 
-    #jsonButton:active {
+    button:active {
       background: rgba(255,255,255,0.2);
     }
   </style>
@@ -101,14 +157,26 @@
 
 <body>
 
-<div id="ui">
-  <div class="title">WEBXR SPATIAL SCANNER</div>
-  <div id="debug">Waiting for XR...</div>
+<div id="debug">
+  <div class="title">
+    WEBXR SPATIAL SCANNER
+  </div>
+
+  <div id="debugContent">
+    Checking WebXR...
+  </div>
 </div>
 
-<button id="jsonButton">
-  EXPORT JSON
-</button>
+<div id="buttons">
+  <button id="exportButton">
+    EXPORT SPATIAL MAP
+  </button>
+
+  <button id="clearButton">
+    CLEAR POINT CLOUD
+  </button>
+</div>
+
 
 <script type="module">
 
@@ -120,55 +188,105 @@
 
 
   /* ============================================================
-     CONFIG
+     CONFIGURATION
      ============================================================ */
 
   const CONFIG = {
 
-    planeHeightThreshold: 0.15,
+    /*
+     * Plane visualization.
+     */
 
     showPlanes: true,
+
     showPlaneEdges: true,
-    showPlaneNormals: true,
+
     showPlaneCenters: true,
 
-    showFloorGrid: true,
+    showPlaneNormals: true,
 
-    collectDepthPoints: true,
+
+    /*
+     * Depth point cloud.
+     *
+     * 1 = every depth pixel.
+     * 4 = every 4th pixel.
+     * 8 = every 8th pixel.
+     *
+     * 8 is a reasonable diagnostic value.
+     */
 
     depthSampleStep: 8,
 
-    maxDepthPoints: 10000,
+    maxDepthPoints: 30000,
+
+    depthMaxDistance: 12,
 
     pointSize: 0.012,
 
-    normalLength: 0.25,
+    depthUpdateInterval: 4,
 
-    floorGridSize: 20,
-    floorGridStep: 0.25
+
+    /*
+     * Floor grid.
+     */
+
+    showFloorGrid: true,
+
+    floorGridSize: 10,
+
+    floorGridStep: 0.25,
+
+
+    /*
+     * Hit test.
+     */
+
+    showHitTest: true,
+
+
+    /*
+     * Debug update frequency.
+     */
+
+    debugUpdateInterval: 15
   };
 
 
   /* ============================================================
-     THREE
+     THREE.JS
      ============================================================ */
 
-  const scene = new THREE.Scene();
+  const scene =
+          new THREE.Scene();
 
-  const camera = new THREE.PerspectiveCamera(
-          70,
-          window.innerWidth / window.innerHeight,
-          0.01,
-          100
-  );
 
-  const renderer = new THREE.WebGLRenderer({
-    antialias: true,
-    alpha: true
-  });
+  const camera =
+          new THREE.PerspectiveCamera(
+                  70,
+                  window.innerWidth /
+                  window.innerHeight,
+                  0.01,
+                  100
+          );
+
+
+  const renderer =
+          new THREE.WebGLRenderer({
+
+            antialias: true,
+
+            alpha: true,
+
+            powerPreference: "high-performance"
+          });
+
 
   renderer.setPixelRatio(
-          Math.min(window.devicePixelRatio, 2)
+          Math.min(
+                  window.devicePixelRatio || 1,
+                  2
+          )
   );
 
   renderer.setSize(
@@ -178,11 +296,16 @@
 
   renderer.xr.enabled = true;
 
-  renderer.xr.setReferenceSpaceType("local-floor");
+  renderer.outputColorSpace =
+          THREE.SRGBColorSpace;
 
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.setAnimationLoop(
+          render
+  );
 
-  document.body.appendChild(renderer.domElement);
+  document.body.appendChild(
+          renderer.domElement
+  );
 
 
   /* ============================================================
@@ -199,61 +322,252 @@
 
 
   /* ============================================================
-     DEBUG GROUPS
+     VISUAL GROUPS
      ============================================================ */
 
-  const planeGroup = new THREE.Group();
+  const planeGroup =
+          new THREE.Group();
 
-  const normalGroup = new THREE.Group();
+  const planeEdgeGroup =
+          new THREE.Group();
 
-  const centerGroup = new THREE.Group();
+  const planeNormalGroup =
+          new THREE.Group();
 
-  const pointCloudGroup = new THREE.Group();
+  const planeCenterGroup =
+          new THREE.Group();
 
-  const floorGridGroup = new THREE.Group();
+  const depthPointGroup =
+          new THREE.Group();
+
+  const floorGridGroup =
+          new THREE.Group();
+
+  const hitTestGroup =
+          new THREE.Group();
+
 
   scene.add(planeGroup);
-  scene.add(normalGroup);
-  scene.add(centerGroup);
-  scene.add(pointCloudGroup);
+  scene.add(planeEdgeGroup);
+  scene.add(planeNormalGroup);
+  scene.add(planeCenterGroup);
+  scene.add(depthPointGroup);
   scene.add(floorGridGroup);
+  scene.add(hitTestGroup);
 
 
   /* ============================================================
-     SPATIAL DATA
+     DEBUG ELEMENT
+     ============================================================ */
+
+  const debugContent =
+          document.getElementById(
+                  "debugContent"
+          );
+
+
+  /* ============================================================
+     MATERIALS
+     ============================================================ */
+
+  const floorMaterial =
+          new THREE.MeshBasicMaterial({
+
+            color: 0x00ff00,
+
+            transparent: true,
+
+            opacity: 0.18,
+
+            side: THREE.DoubleSide,
+
+            depthWrite: false
+          });
+
+
+  const wallMaterial =
+          new THREE.MeshBasicMaterial({
+
+            color: 0x0088ff,
+
+            transparent: true,
+
+            opacity: 0.15,
+
+            side: THREE.DoubleSide,
+
+            depthWrite: false
+          });
+
+
+  const horizontalMaterial =
+          new THREE.MeshBasicMaterial({
+
+            color: 0xffff00,
+
+            transparent: true,
+
+            opacity: 0.13,
+
+            side: THREE.DoubleSide,
+
+            depthWrite: false
+          });
+
+
+  const otherMaterial =
+          new THREE.MeshBasicMaterial({
+
+            color: 0xff00ff,
+
+            transparent: true,
+
+            opacity: 0.12,
+
+            side: THREE.DoubleSide,
+
+            depthWrite: false
+          });
+
+
+  const edgeMaterial =
+          new THREE.LineBasicMaterial({
+
+            color: 0xffffff,
+
+            transparent: true,
+
+            opacity: 0.8
+          });
+
+
+  const normalMaterial =
+          new THREE.LineBasicMaterial({
+
+            color: 0xff3333
+          });
+
+
+  const centerMaterial =
+          new THREE.MeshBasicMaterial({
+
+            color: 0xffffff
+          });
+
+
+  /* ============================================================
+     DEPTH POINT CLOUD MATERIAL
+     ============================================================ */
+
+  const depthPointMaterial =
+          new THREE.PointsMaterial({
+
+            color: 0xffffff,
+
+            size: CONFIG.pointSize,
+
+            sizeAttenuation: true,
+
+            transparent: true,
+
+            opacity: 0.8,
+
+            depthWrite: false
+          });
+
+
+  const depthGeometry =
+          new THREE.BufferGeometry();
+
+
+  const depthPositions =
+          new Float32Array(
+                  CONFIG.maxDepthPoints * 3
+          );
+
+
+  depthGeometry.setAttribute(
+          "position",
+          new THREE.BufferAttribute(
+                  depthPositions,
+                  3
+          )
+  );
+
+
+  depthGeometry.setDrawRange(
+          0,
+          0
+  );
+
+
+  const depthPoints =
+          new THREE.Points(
+                  depthGeometry,
+                  depthPointMaterial
+          );
+
+
+  depthPointGroup.add(
+          depthPoints
+  );
+
+
+  /* ============================================================
+     SPATIAL MAP
      ============================================================ */
 
   const spatialMap = {
 
+    version: 2,
+
+    type: "webxr-spatial-map",
+
     startedAt: null,
+
+    lastUpdate: null,
 
     frames: 0,
 
-    planesDetected: 0,
+    xrFrames: 0,
 
-    planesAdded: 0,
+    renderFrames: 0,
 
-    planesUpdated: 0,
 
-    planesRemoved: 0,
+    session: {
 
-    depthFrames: 0,
+      supported: false,
 
-    depthPoints: 0,
+      active: false,
 
-    hitTests: 0,
+      visibilityState: null,
 
-    floorPlanes: 0,
+      environmentBlendMode: null,
 
-    wallPlanes: 0,
+      interactionMode: null,
 
-    horizontalPlanes: 0,
+      depthUsage: null,
 
-    verticalPlanes: 0,
+      depthDataFormat: null,
 
-    otherPlanes: 0,
+      inputSources: 0
+    },
+
+
+    features: {
+
+      planeDetection: false,
+
+      hitTest: false,
+
+      depthSensing: false,
+
+      localFloor: false
+    },
+
 
     camera: {
+
       position: {
         x: 0,
         y: 0,
@@ -268,70 +582,104 @@
       }
     },
 
+
     planes: {},
 
-    points: [],
 
-    hitTest: null
+    depth: {
+
+      frames: 0,
+
+      samples: 0,
+
+      worldPoints: 0,
+
+      width: 0,
+
+      height: 0,
+
+      rawValueToMeters: 0,
+
+      format: null,
+
+      usage: null
+    },
+
+
+    hitTest: {
+
+      available: false,
+
+      hits: 0,
+
+      position: null,
+
+      distance: null
+    }
   };
 
 
   /* ============================================================
-     PLANE VISUAL OBJECT
+     PLANE OBJECTS
      ============================================================ */
 
-  const planeObjects = new Map();
+  const planeObjects =
+          new Map();
+
+
+  const planeIds =
+          new WeakMap();
+
+
+  let nextPlaneId = 1;
 
 
   /* ============================================================
-     MATERIALS
+     XR STATE
      ============================================================ */
 
-  const planeMaterial = new THREE.MeshBasicMaterial({
+  let currentSession = null;
 
-    color: 0x00ff88,
+  let hitTestSource = null;
 
-    transparent: true,
+  let viewerSpace = null;
 
-    opacity: 0.16,
+  let lastDepthUpdateFrame = -1;
 
-    side: THREE.DoubleSide,
-
-    depthWrite: false
-  });
-
-
-  const planeLineMaterial =
-          new THREE.LineBasicMaterial({
-
-            color: 0x00ff88,
-
-            transparent: true,
-
-            opacity: 0.8
-          });
-
-
-  const normalMaterial =
-          new THREE.LineBasicMaterial({
-
-            color: 0xff4444
-          });
-
-
-  const centerMaterial =
-          new THREE.MeshBasicMaterial({
-
-            color: 0xffff00
-          });
+  let lastFloorGridSignature = "";
 
 
   /* ============================================================
-     UI
+     UTILITY
      ============================================================ */
 
-  const debugElement =
-          document.getElementById("debug");
+  function fmt(
+          value,
+          digits = 3
+  ) {
+
+    if (!Number.isFinite(value)) {
+
+      return "n/a";
+    }
+
+    return Number(value)
+            .toFixed(digits);
+  }
+
+
+  function vectorText(v) {
+
+    return (
+            "(" +
+            fmt(v.x) +
+            ", " +
+            fmt(v.y) +
+            ", " +
+            fmt(v.z) +
+            ")"
+    );
+  }
 
 
   function escapeHtml(value) {
@@ -343,265 +691,28 @@
   }
 
 
-  function fmt(value, digits = 3) {
-
-    if (!Number.isFinite(value)) {
-      return "n/a";
-    }
-
-    return Number(value).toFixed(digits);
-  }
-
-
-  function vectorString(v) {
-
-    return `(${fmt(v.x)}, ${fmt(v.y)}, ${fmt(v.z)})`;
-  }
-
-
-  function updateDebug(extra = "") {
-
-    const session =
-            renderer.xr.getSession();
-
-    const referenceSpace =
-            renderer.xr.getReferenceSpace();
-
-    let sessionInfo = "no session";
-
-    if (session) {
-
-      sessionInfo = `
-            <div>
-                XR mode:
-                <span class="ok">
-                    ${escapeHtml(session.visibilityState || "unknown")}
-                </span>
-            </div>
-
-            <div>
-                depthUsage:
-                ${escapeHtml(session.depthUsage || "none")}
-            </div>
-
-            <div>
-                depthDataFormat:
-                ${escapeHtml(session.depthDataFormat || "none")}
-            </div>
-
-            <div>
-                inputSources:
-                ${session.inputSources.length}
-            </div>
-        `;
-    }
-
-    const planes =
-            Object.values(spatialMap.planes);
-
-    const floor =
-            planes.filter(p => p.classification === "floor").length;
-
-    const walls =
-            planes.filter(p => p.classification === "wall").length;
-
-    const horizontal =
-            planes.filter(p => p.orientation === "horizontal").length;
-
-    const vertical =
-            planes.filter(p => p.orientation === "vertical").length;
-
-    const points =
-            spatialMap.points.length;
-
-    let planeDetails = "";
-
-    for (const plane of planes) {
-
-      planeDetails += `
-            <div style="margin-top:5px">
-                <b>${escapeHtml(plane.classification)}</b>
-                id=${escapeHtml(plane.id)}
-
-                <br>
-                orientation=${escapeHtml(plane.orientation)}
-
-                <br>
-                center=${escapeHtml(
-              vectorString(plane.center)
-      )}
-
-                <br>
-                normal=${escapeHtml(
-              vectorString(plane.normal)
-      )}
-
-                <br>
-                vertices=${plane.vertexCount}
-
-                <br>
-                area=${fmt(plane.area, 3)} m²
-
-                <br>
-                size=${fmt(plane.width, 3)}
-                ×
-                ${fmt(plane.height, 3)} m
-
-                <br>
-                updates=${plane.updates}
-            </div>
-        `;
-    }
-
-    debugElement.innerHTML = `
-
-        ${sessionInfo}
-
-        <div class="section">
-            SESSION
-        </div>
-
-        frames=${spatialMap.frames}
-        <br>
-        referenceSpace=${referenceSpace ? "yes" : "no"}
-
-        <div class="section">
-            PLANES
-        </div>
-
-        detected=${spatialMap.planesDetected}
-        <br>
-        tracked=${planes.length}
-        <br>
-        floor=${floor}
-        <br>
-        walls=${walls}
-        <br>
-        horizontal=${horizontal}
-        <br>
-        vertical=${vertical}
-        <br>
-        added=${spatialMap.planesAdded}
-        <br>
-        updated=${spatialMap.planesUpdated}
-        <br>
-        removed=${spatialMap.planesRemoved}
-
-        <div class="section">
-            DEPTH
-        </div>
-
-        depthFrames=${spatialMap.depthFrames}
-        <br>
-        points=${points}
-
-        <div class="section">
-            CAMERA
-        </div>
-
-        position=${escapeHtml(
-            vectorString(
-                    new THREE.Vector3(
-                            spatialMap.camera.position.x,
-                            spatialMap.camera.position.y,
-                            spatialMap.camera.position.z
-                    )
-            )
-    )}
-
-        <div class="section">
-            HIT TEST
-        </div>
-
-        ${
-            spatialMap.hitTest
-                    ? `
-                    position=${
-                            escapeHtml(
-                                    vectorString(
-                                            spatialMap.hitTest.position
-                                    )
-                            )
-                    }
-
-                    <br>
-                    distance=${
-                            fmt(
-                                    spatialMap.hitTest.distance,
-                                    3
-                            )
-                    } m
-                `
-                    : "no result"
-    }
-
-        <div class="section">
-            PLANES DETAIL
-        </div>
-
-        ${planeDetails}
-
-        ${extra}
-    `;
-  }
-
-
   /* ============================================================
-     PLANE CLASSIFICATION
+     PLANE ID
      ============================================================ */
 
-  function classifyPlane(
-          plane,
-          pose,
-          referenceSpace
-  ) {
+  function getPlaneId(plane) {
 
-    const orientation =
-            plane.orientation || "unknown";
+    let id =
+            planeIds.get(plane);
 
-    if (!pose) {
+    if (!id) {
 
-      return {
-        classification: orientation
-      };
+      id =
+              "plane-" +
+              nextPlaneId++;
+
+      planeIds.set(
+              plane,
+              id
+      );
     }
 
-    const position =
-            pose.transform.position;
-
-    const y =
-            position.y;
-
-    if (orientation === "vertical") {
-
-      return {
-        classification: "wall"
-      };
-    }
-
-    if (orientation === "horizontal") {
-
-      /*
-       * local-floor usually places floor close to Y = 0.
-       *
-       * Do not assume every horizontal plane is floor.
-       */
-
-      if (Math.abs(y) < CONFIG.planeHeightThreshold) {
-
-        return {
-          classification: "floor"
-        };
-      }
-
-      return {
-        classification: "horizontal"
-      };
-    }
-
-    return {
-      classification: "other"
-    };
+    return id;
   }
 
 
@@ -611,19 +722,35 @@
 
   function polygonArea(points) {
 
-    if (!points || points.length < 3) {
+    if (
+            !points ||
+            points.length < 3
+    ) {
 
       return 0;
     }
 
     let area = 0;
 
-    for (let i = 0; i < points.length; i++) {
+    /*
+     * XRPlane polygon is represented in
+     * plane-local XY coordinates.
+     */
 
-      const a = points[i];
+    for (
+            let i = 0;
+            i < points.length;
+            i++
+    ) {
+
+      const a =
+              points[i];
 
       const b =
-              points[(i + 1) % points.length];
+              points[
+              (i + 1) %
+              points.length
+                      ];
 
       area +=
               a.x * b.y -
@@ -635,61 +762,289 @@
 
 
   /* ============================================================
-     PLANE GEOMETRY
+     POLYGON BOUNDS
      ============================================================ */
 
-  function buildPlaneObject(
-          plane,
-          pose,
-          planeData
+  function polygonBounds(points) {
+
+    if (
+            !points ||
+            points.length === 0
+    ) {
+
+      return {
+
+        minX: 0,
+        maxX: 0,
+
+        minY: 0,
+        maxY: 0,
+
+        width: 0,
+        height: 0
+      };
+    }
+
+    let minX = Infinity;
+    let maxX = -Infinity;
+
+    let minY = Infinity;
+    let maxY = -Infinity;
+
+
+    for (const point of points) {
+
+      minX =
+              Math.min(
+                      minX,
+                      point.x
+              );
+
+      maxX =
+              Math.max(
+                      maxX,
+                      point.x
+              );
+
+      minY =
+              Math.min(
+                      minY,
+                      point.y
+              );
+
+      maxY =
+              Math.max(
+                      maxY,
+                      point.y
+              );
+    }
+
+
+    return {
+
+      minX,
+      maxX,
+
+      minY,
+      maxY,
+
+      width:
+              maxX - minX,
+
+      height:
+              maxY - minY
+    };
+  }
+
+
+  /* ============================================================
+     WORLD NORMAL
+     ============================================================ */
+
+  function getWorldNormal(
+          pose
   ) {
 
-    const vertices =
+    const q =
+            new THREE.Quaternion(
+                    pose.transform.orientation.x,
+                    pose.transform.orientation.y,
+                    pose.transform.orientation.z,
+                    pose.transform.orientation.w
+            );
+
+
+    return new THREE.Vector3(
+            0,
+            1,
+            0
+    )
+            .applyQuaternion(q)
+            .normalize();
+  }
+
+
+  /* ============================================================
+     PLANE CLASSIFICATION
+     ============================================================ */
+
+  function classifyPlane(
+          pose
+  ) {
+
+    const normal =
+            getWorldNormal(
+                    pose
+            );
+
+
+    const absX =
+            Math.abs(normal.x);
+
+    const absY =
+            Math.abs(normal.y);
+
+    const absZ =
+            Math.abs(normal.z);
+
+
+    /*
+     * Horizontal plane.
+     */
+
+    if (absY > 0.85) {
+
+      const y =
+              pose.transform.position.y;
+
+      /*
+       * local-floor origin is normally
+       * around Y = 0.
+       */
+
+      if (
+              Math.abs(y) <
+              0.20
+      ) {
+
+        return "floor";
+      }
+
+      /*
+       * High horizontal plane.
+       */
+
+      if (y > 1.9) {
+
+        return "ceiling";
+      }
+
+      return "horizontal";
+    }
+
+
+    /*
+     * Vertical plane.
+     */
+
+    if (
+            absX > 0.85 ||
+            absZ > 0.85
+    ) {
+
+      return "wall";
+    }
+
+
+    return "other";
+  }
+
+
+  /* ============================================================
+     CREATE PLANE MESH
+     ============================================================ */
+
+  function createPlaneMesh(
+          plane,
+          pose,
+          classification
+  ) {
+
+    const polygon =
             plane.polygon;
 
-    if (!vertices || vertices.length < 3) {
+    if (
+            !polygon ||
+            polygon.length < 3
+    ) {
 
       return null;
     }
 
+
+    /*
+     * XRPlane polygon is in the
+     * local XY coordinate system of
+     * plane.planeSpace.
+     */
+
     const shape =
             new THREE.Shape();
 
+
     shape.moveTo(
-            vertices[0].x,
-            vertices[0].z
+            polygon[0].x,
+            polygon[0].y
     );
+
 
     for (
             let i = 1;
-            i < vertices.length;
+            i < polygon.length;
             i++
     ) {
 
       shape.lineTo(
-              vertices[i].x,
-              vertices[i].z
+              polygon[i].x,
+              polygon[i].y
       );
     }
 
+
     shape.closePath();
 
+
     const geometry =
-            new THREE.ShapeGeometry(shape);
+            new THREE.ShapeGeometry(
+                    shape
+            );
+
+
+    let material;
+
+
+    switch (classification) {
+
+      case "floor":
+        material =
+                floorMaterial.clone();
+        break;
+
+      case "wall":
+        material =
+                wallMaterial.clone();
+        break;
+
+      case "ceiling":
+        material =
+                horizontalMaterial.clone();
+        break;
+
+      case "horizontal":
+        material =
+                horizontalMaterial.clone();
+        break;
+
+      default:
+        material =
+                otherMaterial.clone();
+        break;
+    }
+
 
     const mesh =
             new THREE.Mesh(
                     geometry,
-                    planeMaterial.clone()
+                    material
             );
 
-    mesh.rotation.x = -Math.PI / 2;
 
     mesh.position.set(
             pose.transform.position.x,
             pose.transform.position.y,
             pose.transform.position.z
     );
+
 
     mesh.quaternion.set(
             pose.transform.orientation.x,
@@ -698,76 +1053,89 @@
             pose.transform.orientation.w
     );
 
-    mesh.userData.planeId =
-            planeData.id;
 
     return mesh;
   }
 
 
   /* ============================================================
-     PLANE EDGES
+     CREATE PLANE EDGES
      ============================================================ */
 
-  function buildPlaneEdges(
+  function createPlaneEdges(
           plane,
           pose
   ) {
 
-    const points =
+    const polygon =
             plane.polygon;
 
-    if (!points || points.length < 2) {
+    if (
+            !polygon ||
+            polygon.length < 2
+    ) {
 
       return null;
     }
 
-    const geometry =
-            new THREE.BufferGeometry();
 
-    const vertices = [];
+    const positions = [];
+
 
     for (
             let i = 0;
-            i < points.length;
+            i < polygon.length;
             i++
     ) {
 
-      const a = points[i];
+      const a =
+              polygon[i];
 
       const b =
-              points[(i + 1) % points.length];
+              polygon[
+              (i + 1) %
+              polygon.length
+                      ];
 
-      vertices.push(
+
+      positions.push(
               a.x,
+              a.y,
               0,
-              a.z,
 
               b.x,
-              0,
-              b.z
+              b.y,
+              0
       );
     }
+
+
+    const geometry =
+            new THREE.BufferGeometry();
+
 
     geometry.setAttribute(
             "position",
             new THREE.Float32BufferAttribute(
-                    vertices,
+                    positions,
                     3
             )
     );
 
+
     const lines =
             new THREE.LineSegments(
                     geometry,
-                    planeLineMaterial.clone()
+                    edgeMaterial.clone()
             );
+
 
     lines.position.set(
             pose.transform.position.x,
             pose.transform.position.y,
             pose.transform.position.z
     );
+
 
     lines.quaternion.set(
             pose.transform.orientation.x,
@@ -776,16 +1144,16 @@
             pose.transform.orientation.w
     );
 
+
     return lines;
   }
 
 
   /* ============================================================
-     PLANE NORMAL
+     CREATE NORMAL
      ============================================================ */
 
-  function buildNormal(
-          plane,
+  function createPlaneNormal(
           pose
   ) {
 
@@ -796,35 +1164,30 @@
                     pose.transform.position.z
             );
 
-    const quaternion =
-            new THREE.Quaternion(
-                    pose.transform.orientation.x,
-                    pose.transform.orientation.y,
-                    pose.transform.orientation.z,
-                    pose.transform.orientation.w
-            );
 
     const normal =
-            new THREE.Vector3(
-                    0,
-                    1,
-                    0
-            ).applyQuaternion(quaternion)
-                    .normalize();
-
-    const end =
-            origin.clone().add(
-                    normal.clone()
-                            .multiplyScalar(
-                                    CONFIG.normalLength
-                            )
+            getWorldNormal(
+                    pose
             );
 
+
+    const end =
+            origin.clone()
+                    .add(
+                            normal.clone()
+                                    .multiplyScalar(
+                                            0.25
+                                    )
+                    );
+
+
     const geometry =
-            new THREE.BufferGeometry().setFromPoints([
-              origin,
-              end
-            ]);
+            new THREE.BufferGeometry()
+                    .setFromPoints([
+                      origin,
+                      end
+                    ]);
+
 
     return new THREE.Line(
             geometry,
@@ -834,25 +1197,23 @@
 
 
   /* ============================================================
-     PLANE CENTER
+     CREATE CENTER
      ============================================================ */
 
-  function buildCenter(
+  function createPlaneCenter(
           pose
   ) {
 
-    const geometry =
-            new THREE.SphereGeometry(
-                    0.025,
-                    8,
-                    8
-            );
-
     const mesh =
             new THREE.Mesh(
-                    geometry,
+                    new THREE.SphereGeometry(
+                            0.025,
+                            8,
+                            8
+                    ),
                     centerMaterial
             );
+
 
     mesh.position.set(
             pose.transform.position.x,
@@ -860,7 +1221,90 @@
             pose.transform.position.z
     );
 
+
     return mesh;
+  }
+
+
+  /* ============================================================
+     DISPOSE OBJECT
+     ============================================================ */
+
+  function disposeObject(
+          object
+  ) {
+
+    if (!object) {
+      return;
+    }
+
+
+    if (object.parent) {
+
+      object.parent.remove(
+              object
+      );
+    }
+
+
+    if (object.geometry) {
+
+      object.geometry.dispose();
+    }
+
+
+    if (object.material) {
+
+      if (
+              Array.isArray(
+                      object.material
+              )
+      ) {
+
+        for (
+                const material
+                of object.material
+                ) {
+
+          material.dispose();
+        }
+
+      } else {
+
+        object.material.dispose();
+      }
+    }
+  }
+
+
+  /* ============================================================
+     REMOVE PLANE VISUAL
+     ============================================================ */
+
+  function removePlaneVisual(
+          visual
+  ) {
+
+    if (!visual) {
+      return;
+    }
+
+
+    disposeObject(
+            visual.mesh
+    );
+
+    disposeObject(
+            visual.edges
+    );
+
+    disposeObject(
+            visual.normal
+    );
+
+    disposeObject(
+            visual.center
+    );
   }
 
 
@@ -868,36 +1312,53 @@
      UPDATE PLANES
      ============================================================ */
 
-  function updatePlanes(frame) {
+  function updatePlanes(
+          frame
+  ) {
 
     const detectedPlanes =
             frame.detectedPlanes;
 
+
     if (!detectedPlanes) {
+
+      spatialMap.features.planeDetection =
+              false;
 
       return;
     }
 
-    spatialMap.planesDetected =
-            detectedPlanes.size;
+
+    spatialMap.features.planeDetection =
+            true;
+
 
     const referenceSpace =
             renderer.xr.getReferenceSpace();
 
-    if (!referenceSpace) {
 
+    if (!referenceSpace) {
       return;
     }
 
-    const currentlyVisible =
+
+    const visibleIds =
             new Set();
 
-    for (const plane of detectedPlanes) {
+
+    for (
+            const plane
+            of detectedPlanes
+            ) {
 
       const id =
-              getPlaneId(plane);
+              getPlaneId(
+                      plane
+              );
 
-      currentlyVisible.add(id);
+
+      visibleIds.add(id);
+
 
       const pose =
               frame.getPose(
@@ -905,29 +1366,43 @@
                       referenceSpace
               );
 
-      if (!pose) {
 
+      if (!pose) {
         continue;
       }
 
+
       const classification =
               classifyPlane(
-                      plane,
-                      pose,
-                      referenceSpace
+                      pose
               );
 
-      const points =
+
+      const polygon =
               plane.polygon || [];
 
+
       const area =
-              polygonArea(points);
+              polygonArea(
+                      polygon
+              );
+
 
       const bounds =
-              getPolygonBounds(points);
+              polygonBounds(
+                      polygon
+              );
+
+
+      const worldNormal =
+              getWorldNormal(
+                      pose
+              );
+
 
       let data =
               spatialMap.planes[id];
+
 
       if (!data) {
 
@@ -936,10 +1411,10 @@
           id,
 
           orientation:
-                  plane.orientation || "unknown",
+                  plane.orientation ||
+                  "unknown",
 
-          classification:
-          classification.classification,
+          classification,
 
           center: {
             x: 0,
@@ -953,6 +1428,8 @@
             z: 0
           },
 
+          polygon: [],
+
           vertexCount: 0,
 
           area: 0,
@@ -961,213 +1438,186 @@
 
           height: 0,
 
-          updates: 0
+          updates: 0,
+
+          lastChangedTime:
+                  plane.lastChangedTime ||
+                  null
         };
+
 
         spatialMap.planes[id] =
                 data;
-
-        spatialMap.planesAdded++;
       }
-      else {
 
-        spatialMap.planesUpdated++;
-      }
 
       data.orientation =
-              plane.orientation || "unknown";
+              plane.orientation ||
+              "unknown";
+
 
       data.classification =
-              classification.classification;
+              classification;
+
+
+      data.center = {
+
+        x:
+        pose.transform.position.x,
+
+        y:
+        pose.transform.position.y,
+
+        z:
+        pose.transform.position.z
+      };
+
+
+      data.normal = {
+
+        x:
+        worldNormal.x,
+
+        y:
+        worldNormal.y,
+
+        z:
+        worldNormal.z
+      };
+
 
       data.vertexCount =
-              points.length;
+              polygon.length;
+
 
       data.area =
               area;
 
+
       data.width =
               bounds.width;
+
 
       data.height =
               bounds.height;
 
-      data.center = {
 
-        x: pose.transform.position.x,
-
-        y: pose.transform.position.y,
-
-        z: pose.transform.position.z
-      };
-
-      const q =
-              new THREE.Quaternion(
-                      pose.transform.orientation.x,
-                      pose.transform.orientation.y,
-                      pose.transform.orientation.z,
-                      pose.transform.orientation.w
+      data.polygon =
+              polygon.map(
+                      p => ({
+                        x: p.x,
+                        y: p.y
+                      })
               );
 
-      const normal =
-              new THREE.Vector3(
-                      0,
-                      1,
-                      0
-              ).applyQuaternion(q)
-                      .normalize();
-
-      data.normal = {
-
-        x: normal.x,
-        y: normal.y,
-        z: normal.z
-      };
 
       data.updates++;
 
 
-      /* --------------------------------------------
-         CREATE / RECREATE VISUAL
-         -------------------------------------------- */
+      data.lastChangedTime =
+              plane.lastChangedTime ||
+              data.lastChangedTime;
 
-      let visual =
-              planeObjects.get(id);
 
-      if (visual) {
+      /*
+       * Rebuild visual.
+       *
+       * This is intentionally simple and
+       * robust for a diagnostic scanner.
+       */
 
-        planeGroup.remove(
-                visual.mesh
+      const oldVisual =
+              planeObjects.get(
+                      id
+              );
+
+
+      if (oldVisual) {
+
+        removePlaneVisual(
+                oldVisual
         );
-
-        if (visual.edges) {
-
-          planeGroup.remove(
-                  visual.edges
-          );
-        }
-
-        if (visual.normal) {
-
-          normalGroup.remove(
-                  visual.normal
-          );
-        }
-
-        if (visual.center) {
-
-          centerGroup.remove(
-                  visual.center
-          );
-        }
-
-        visual.mesh.geometry.dispose();
-
-        if (visual.edges) {
-
-          visual.edges.geometry.dispose();
-        }
-
-        if (visual.normal) {
-
-          visual.normal.geometry.dispose();
-        }
-
-        if (visual.center) {
-
-          visual.center.geometry.dispose();
-        }
       }
 
 
       const mesh =
-              buildPlaneObject(
-                      plane,
-                      pose,
-                      data
-              );
+              CONFIG.showPlanes
+                      ? createPlaneMesh(
+                              plane,
+                              pose,
+                              classification
+                      )
+                      : null;
+
 
       const edges =
               CONFIG.showPlaneEdges
-                      ? buildPlaneEdges(
+                      ? createPlaneEdges(
                               plane,
                               pose
                       )
                       : null;
 
-      const normal =
+
+      const visualNormal =
               CONFIG.showPlaneNormals
-                      ? buildNormal(
-                              plane,
+                      ? createPlaneNormal(
                               pose
                       )
                       : null;
+
 
       const center =
               CONFIG.showPlaneCenters
-                      ? buildCenter(
+                      ? createPlaneCenter(
                               pose
                       )
                       : null;
 
 
-      if (mesh && CONFIG.showPlanes) {
+      if (mesh) {
 
-        if (
-                data.classification ===
-                "floor"
-        ) {
-
-          mesh.material.color
-                  .setHex(0x00ff00);
-
-          mesh.material.opacity =
-                  0.22;
-        }
-        else if (
-                data.classification ===
-                "wall"
-        ) {
-
-          mesh.material.color
-                  .setHex(0x0088ff);
-
-          mesh.material.opacity =
-                  0.18;
-        }
-        else {
-
-          mesh.material.color
-                  .setHex(0xffff00);
-
-          mesh.material.opacity =
-                  0.12;
-        }
-
-        planeGroup.add(mesh);
+        planeGroup.add(
+                mesh
+        );
       }
+
 
       if (edges) {
 
-        planeGroup.add(edges);
+        planeEdgeGroup.add(
+                edges
+        );
       }
 
-      if (normal) {
 
-        normalGroup.add(normal);
+      if (visualNormal) {
+
+        planeNormalGroup.add(
+                visualNormal
+        );
       }
+
 
       if (center) {
 
-        centerGroup.add(center);
+        planeCenterGroup.add(
+                center
+        );
       }
+
 
       planeObjects.set(
               id,
               {
+
                 mesh,
+
                 edges,
-                normal,
+
+                normal:
+                visualNormal,
+
                 center
               }
       );
@@ -1175,137 +1625,35 @@
 
 
     /*
-     * Detect removed planes.
+     * Remove planes that disappeared.
      */
 
     for (
-            const [id, visual]
+            const [
+              id,
+              visual
+            ]
             of planeObjects
             ) {
 
       if (
-              !currentlyVisible.has(id)
+              !visibleIds.has(id)
       ) {
 
-        spatialMap.planesRemoved++;
-
-        planeGroup.remove(
-                visual.mesh
+        removePlaneVisual(
+                visual
         );
 
-        if (visual.edges) {
-
-          planeGroup.remove(
-                  visual.edges
-          );
-        }
-
-        if (visual.normal) {
-
-          normalGroup.remove(
-                  visual.normal
-          );
-        }
-
-        if (visual.center) {
-
-          centerGroup.remove(
-                  visual.center
-          );
-        }
-
-        visual.mesh.geometry.dispose();
-
-        if (visual.edges) {
-
-          visual.edges.geometry.dispose();
-        }
-
-        if (visual.normal) {
-
-          visual.normal.geometry.dispose();
-        }
-
-        if (visual.center) {
-
-          visual.center.geometry.dispose();
-        }
-
-        planeObjects.delete(id);
+        planeObjects.delete(
+                id
+        );
 
         delete spatialMap.planes[id];
       }
     }
-  }
 
 
-  /* ============================================================
-     PLANE ID
-     ============================================================ */
-
-  const planeIds =
-          new WeakMap();
-
-  let nextPlaneId = 1;
-
-
-  function getPlaneId(plane) {
-
-    if (!planeIds.has(plane)) {
-
-      planeIds.set(
-              plane,
-              `plane-${nextPlaneId++}`
-      );
-    }
-
-    return planeIds.get(plane);
-  }
-
-
-  /* ============================================================
-     POLYGON BOUNDS
-     ============================================================ */
-
-  function getPolygonBounds(points) {
-
-    if (!points || !points.length) {
-
-      return {
-        width: 0,
-        height: 0
-      };
-    }
-
-    let minX = Infinity;
-    let maxX = -Infinity;
-
-    let minZ = Infinity;
-    let maxZ = -Infinity;
-
-    for (const p of points) {
-
-      minX =
-              Math.min(minX, p.x);
-
-      maxX =
-              Math.max(maxX, p.x);
-
-      minZ =
-              Math.min(minZ, p.z);
-
-      maxZ =
-              Math.max(maxZ, p.z);
-    }
-
-    return {
-
-      width:
-              maxX - minX,
-
-      height:
-              maxZ - minZ
-    };
+    rebuildFloorGrid();
   }
 
 
@@ -1315,29 +1663,70 @@
 
   function rebuildFloorGrid() {
 
-    floorGridGroup.clear();
-
-    if (!CONFIG.showFloorGrid) {
+    if (
+            !CONFIG.showFloorGrid
+    ) {
 
       return;
     }
 
+
     const floors =
             Object.values(
                     spatialMap.planes
-            ).filter(
-                    p =>
-                            p.classification ===
-                            "floor"
-            );
+            )
+                    .filter(
+                            p =>
+                                    p.classification ===
+                                    "floor"
+                    );
+
 
     if (!floors.length) {
 
       return;
     }
 
+
+    /*
+     * Select the largest detected floor.
+     */
+
+    floors.sort(
+            (a, b) =>
+                    b.area - a.area
+    );
+
+
     const floor =
             floors[0];
+
+
+    const signature =
+            [
+              floor.id,
+              floor.center.x.toFixed(2),
+              floor.center.y.toFixed(2),
+              floor.center.z.toFixed(2),
+              floor.area.toFixed(2)
+            ].join("|");
+
+
+    if (
+            signature ===
+            lastFloorGridSignature
+    ) {
+
+      return;
+    }
+
+
+    lastFloorGridSignature =
+            signature;
+
+
+    floorGridGroup.clear();
+
 
     const size =
             CONFIG.floorGridSize;
@@ -1345,7 +1734,9 @@
     const step =
             CONFIG.floorGridStep;
 
-    const vertices = [];
+
+    const positions = [];
+
 
     for (
             let x = -size;
@@ -1353,7 +1744,7 @@
             x += step
     ) {
 
-      vertices.push(
+      positions.push(
               x,
               0,
               -size,
@@ -1364,13 +1755,14 @@
       );
     }
 
+
     for (
             let z = -size;
             z <= size;
             z += step
     ) {
 
-      vertices.push(
+      positions.push(
               -size,
               0,
               z,
@@ -1381,26 +1773,30 @@
       );
     }
 
+
     const geometry =
             new THREE.BufferGeometry();
+
 
     geometry.setAttribute(
             "position",
             new THREE.Float32BufferAttribute(
-                    vertices,
+                    positions,
                     3
             )
     );
 
+
     const material =
             new THREE.LineBasicMaterial({
 
-              color: 0x555555,
+              color: 0x444444,
 
               transparent: true,
 
-              opacity: 0.35
+              opacity: 0.25
             });
+
 
     const grid =
             new THREE.LineSegments(
@@ -1408,52 +1804,202 @@
                     material
             );
 
+
     grid.position.set(
             floor.center.x,
-            floor.center.y + 0.002,
+            floor.center.y + 0.003,
             floor.center.z
     );
 
-    floorGridGroup.add(grid);
+
+    floorGridGroup.add(
+            grid
+    );
   }
 
 
   /* ============================================================
-     DEPTH SCANNING
+     DEPTH SUPPORT
      ============================================================ */
 
-  function collectDepth(frame) {
-
-    if (!CONFIG.collectDepthPoints) {
-
-      return;
-    }
-
-    const session =
-            renderer.xr.getSession();
+  function hasDepthSupport(
+          session
+  ) {
 
     if (!session) {
-
-      return;
+      return false;
     }
+
+
+    if (
+            typeof session.depthUsage !==
+            "string"
+    ) {
+
+      return false;
+    }
+
 
     if (
             session.depthUsage !==
             "cpu-optimized"
     ) {
 
-      return;
+      /*
+       * GPU depth is intentionally not
+       * processed here.
+       *
+       * CPU depth is much easier to
+       * inspect/debug from JavaScript.
+       */
+
+      return false;
     }
 
-    const viewerPose =
-            frame.getViewerPose(
-                    renderer.xr.getReferenceSpace()
+
+    return true;
+  }
+
+
+  /* ============================================================
+     DEPTH WORLD POSITION
+     ============================================================ */
+
+  function depthSampleToWorld(
+          view,
+          normalizedX,
+          normalizedY,
+          depthMeters
+  ) {
+
+    /*
+     * Build an unprojected ray in view space.
+     */
+
+    const ndcX =
+            normalizedX * 2 - 1;
+
+
+    const ndcY =
+            1 - normalizedY * 2;
+
+
+    const inverseProjection =
+            new THREE.Matrix4()
+                    .copy(
+                            view.projectionMatrix
+                    )
+                    .invert();
+
+
+    const nearPoint =
+            new THREE.Vector4(
+                    ndcX,
+                    ndcY,
+                    -1,
+                    1
+            )
+                    .applyMatrix4(
+                            inverseProjection
+                    );
+
+
+    if (
+            Math.abs(
+                    nearPoint.w
+            ) < 0.000001
+    ) {
+
+      return null;
+    }
+
+
+    nearPoint.multiplyScalar(
+            1 / nearPoint.w
+    );
+
+
+    /*
+     * The camera looks along negative Z.
+     */
+
+    const ray =
+            new THREE.Vector3(
+                    nearPoint.x,
+                    nearPoint.y,
+                    nearPoint.z
+            )
+                    .normalize();
+
+
+    /*
+     * Depth returned by WebXR is
+     * treated here as distance along
+     * the viewing ray.
+     */
+
+    const viewPoint =
+            ray.multiplyScalar(
+                    depthMeters
             );
 
-    if (!viewerPose) {
+
+    /*
+     * XRView.transform.matrix transforms
+     * view space into the XR reference
+     * space.
+     */
+
+    const world =
+            new THREE.Vector3(
+                    viewPoint.x,
+                    viewPoint.y,
+                    viewPoint.z
+            )
+                    .applyMatrix4(
+                            view.transform.matrix
+                    );
+
+
+    return world;
+  }
+
+
+  /* ============================================================
+     COLLECT DEPTH
+     ============================================================ */
+
+  function collectDepth(
+          frame
+  ) {
+
+    const session =
+            renderer.xr.getSession();
+
+
+    if (!session) {
+      return;
+    }
+
+
+    if (
+            !hasDepthSupport(
+                    session
+            )
+    ) {
 
       return;
     }
+
+
+    if (
+            typeof frame.getViewerPose !==
+            "function"
+    ) {
+
+      return;
+    }
+
 
     if (
             typeof frame.getDepthInformation !==
@@ -1463,150 +2009,273 @@
       return;
     }
 
+
+    const referenceSpace =
+            renderer.xr.getReferenceSpace();
+
+
+    if (!referenceSpace) {
+      return;
+    }
+
+
+    const viewerPose =
+            frame.getViewerPose(
+                    referenceSpace
+            );
+
+
+    if (!viewerPose) {
+      return;
+    }
+
+
+    const frameNumber =
+            spatialMap.frames;
+
+
+    if (
+            frameNumber -
+            lastDepthUpdateFrame <
+            CONFIG.depthUpdateInterval
+    ) {
+
+      return;
+    }
+
+
+    lastDepthUpdateFrame =
+            frameNumber;
+
+
     /*
-     * For AR phone mode normally there is
-     * one relevant view.
+     * Only one view is normally used
+     * for handheld AR.
      */
 
-    for (const view of viewerPose.views) {
+    const view =
+            viewerPose.views[0];
 
-      let depthInfo = null;
 
-      try {
+    if (!view) {
+      return;
+    }
 
-        depthInfo =
-                frame.getDepthInformation(
-                        view
-                );
 
-      }
-      catch (error) {
+    let depthInfo = null;
 
-        console.warn(
-                "Depth information error:",
-                error
-        );
 
-        continue;
-      }
+    try {
 
-      if (!depthInfo) {
+      depthInfo =
+              frame.getDepthInformation(
+                      view
+              );
 
-        continue;
-      }
+    }
+    catch (error) {
 
-      spatialMap.depthFrames++;
+      console.warn(
+              "getDepthInformation failed:",
+              error
+      );
 
-      /*
-       * Sampling normalized view coordinates.
-       */
+      return;
+    }
 
-      const step =
-              CONFIG.depthSampleStep;
+
+    if (!depthInfo) {
+
+      return;
+    }
+
+
+    spatialMap.features.depthSensing =
+            true;
+
+
+    spatialMap.depth.frames++;
+
+
+    spatialMap.depth.width =
+            depthInfo.width;
+
+
+    spatialMap.depth.height =
+            depthInfo.height;
+
+
+    spatialMap.depth.rawValueToMeters =
+            depthInfo.rawValueToMeters ||
+            0;
+
+
+    spatialMap.depth.format =
+            session.depthDataFormat ||
+            null;
+
+
+    spatialMap.depth.usage =
+            session.depthUsage ||
+            null;
+
+
+    const step =
+            Math.max(
+                    1,
+                    CONFIG.depthSampleStep
+            );
+
+
+    let pointIndex = 0;
+
+
+    /*
+     * Clear old point cloud.
+     */
+
+    const positions =
+            depthGeometry
+                    .getAttribute(
+                            "position"
+                    )
+                    .array;
+
+
+    for (
+            let y = 0;
+            y < depthInfo.height;
+            y += step
+    ) {
 
       for (
-              let py = 0;
-              py <= 1;
-              py += step /
-                      Math.max(
-                              depthInfo.height,
-                              1
-                      )
+              let x = 0;
+              x < depthInfo.width;
+              x += step
       ) {
 
-        for (
-                let px = 0;
-                px <= 1;
-                px += step /
-                        Math.max(
-                                depthInfo.width,
-                                1
-                        )
+        if (
+                pointIndex >=
+                CONFIG.maxDepthPoints
         ) {
 
-          let depth;
-
-          try {
-
-            depth =
-                    depthInfo.getDepthInMeters(
-                            px,
-                            py
-                    );
-
-          }
-          catch {
-
-            continue;
-          }
-
-          if (
-                  !Number.isFinite(depth) ||
-                  depth <= 0 ||
-                  depth > 20
-          ) {
-
-            continue;
-          }
-
-          /*
-           * We store the depth sample.
-           *
-           * Full world reconstruction from
-           * arbitrary camera pixels requires
-           * the view projection/inverse
-           * transform and the depth-buffer
-           * coordinate transform.
-           *
-           * Keep the raw normalized sample
-           * here as well so diagnostics remain
-           * useful on devices where the exact
-           * projection data differs.
-           */
-
-          spatialMap.points.push({
-
-            x: px,
-
-            y: py,
-
-            z: depth,
-
-            view: view.eye || "unknown"
-          });
-
-          if (
-                  spatialMap.points.length >
-                  CONFIG.maxDepthPoints
-          ) {
-
-            spatialMap.points.shift();
-          }
+          break;
         }
+
+
+        const normalizedX =
+                (
+                        x + 0.5
+                ) /
+                depthInfo.width;
+
+
+        const normalizedY =
+                (
+                        y + 0.5
+                ) /
+                depthInfo.height;
+
+
+        let depth;
+
+
+        try {
+
+          depth =
+                  depthInfo.getDepthInMeters(
+                          normalizedX,
+                          normalizedY
+                  );
+
+        }
+        catch {
+
+          continue;
+        }
+
+
+        if (
+                !Number.isFinite(
+                        depth
+                )
+        ) {
+
+          continue;
+        }
+
+
+        if (
+                depth <= 0 ||
+                depth >
+                CONFIG.depthMaxDistance
+        ) {
+
+          continue;
+        }
+
+
+        const world =
+                depthSampleToWorld(
+                        view,
+                        normalizedX,
+                        normalizedY,
+                        depth
+                );
+
+
+        if (!world) {
+          continue;
+        }
+
+
+        const index =
+                pointIndex * 3;
+
+
+        positions[index] =
+                world.x;
+
+        positions[index + 1] =
+                world.y;
+
+        positions[index + 2] =
+                world.z;
+
+
+        pointIndex++;
+
+
+        spatialMap.depth.samples++;
+      }
+
+
+      if (
+              pointIndex >=
+              CONFIG.maxDepthPoints
+      ) {
+
+        break;
       }
     }
-  }
 
 
-  /* ============================================================
-     DEPTH POINT VISUALIZATION
-     ============================================================ */
+    depthGeometry
+            .setDrawRange(
+                    0,
+                    pointIndex
+            );
 
-  function updateDepthVisualisation() {
 
-    /*
-     * Depth samples are kept as diagnostic data.
-     *
-     * Do not turn every depth sample into a
-     * world-space THREE.Points object here.
-     *
-     * The WebXR depth coordinate transform
-     * must be applied before interpreting
-     * normalized image coordinates as world
-     * coordinates.
-     */
+    depthGeometry
+            .getAttribute(
+                    "position"
+            )
+            .needsUpdate = true;
 
-    return;
+
+    spatialMap.depth.worldPoints =
+            pointIndex;
   }
 
 
@@ -1614,42 +2283,75 @@
      HIT TEST
      ============================================================ */
 
-  let hitTestSource = null;
+  async function initializeHitTest(
+          session
+  ) {
 
+    hitTestSource = null;
 
-  async function initializeHitTest(session) {
+    viewerSpace = null;
 
-    if (!session) {
-
-      return;
-    }
 
     if (
-            !session.requestReferenceSpace
+            typeof session.requestReferenceSpace !==
+            "function"
     ) {
 
       return;
     }
 
+
+    if (
+            typeof session.requestHitTestSource !==
+            "function"
+    ) {
+
+      return;
+    }
+
+
     try {
 
-      const viewerSpace =
+      viewerSpace =
               await session.requestReferenceSpace(
                       "viewer"
               );
 
+
       hitTestSource =
               await session.requestHitTestSource({
-                space: viewerSpace
+
+                space:
+                viewerSpace
               });
+
+
+      spatialMap.features.hitTest =
+              true;
+
+      spatialMap.hitTest.available =
+              true;
+
 
       session.addEventListener(
               "end",
               () => {
 
                 hitTestSource = null;
+
+                viewerSpace = null;
+
+                spatialMap.features.hitTest =
+                        false;
+
+                spatialMap.hitTest.available =
+                        false;
+              },
+              {
+                once: true
               }
       );
+
 
     }
     catch (error) {
@@ -1663,25 +2365,38 @@
 
 
   /* ============================================================
-     HIT TEST UPDATE
+     UPDATE HIT TEST
      ============================================================ */
 
-  function updateHitTest(frame) {
+  function updateHitTest(
+          frame
+  ) {
 
-    if (!hitTestSource) {
+    if (
+            !hitTestSource
+    ) {
+
+      spatialMap.hitTest.position =
+              null;
+
+      spatialMap.hitTest.distance =
+              null;
 
       return;
     }
+
 
     const referenceSpace =
             renderer.xr.getReferenceSpace();
 
-    if (!referenceSpace) {
 
+    if (!referenceSpace) {
       return;
     }
 
-    let results = [];
+
+    let results;
+
 
     try {
 
@@ -1696,25 +2411,32 @@
       return;
     }
 
-    if (!results.length) {
 
-      spatialMap.hitTest = null;
+    if (
+            !results ||
+            results.length === 0
+    ) {
+
+      spatialMap.hitTest.position =
+              null;
+
+      spatialMap.hitTest.distance =
+              null;
 
       return;
     }
 
-    const result =
-            results[0];
 
     const pose =
-            result.getPose(
+            results[0].getPose(
                     referenceSpace
             );
 
-    if (!pose) {
 
+    if (!pose) {
       return;
     }
+
 
     const position =
             new THREE.Vector3(
@@ -1723,6 +2445,7 @@
                     pose.transform.position.z
             );
 
+
     const cameraPosition =
             new THREE.Vector3(
                     spatialMap.camera.position.x,
@@ -1730,27 +2453,94 @@
                     spatialMap.camera.position.z
             );
 
-    spatialMap.hitTests++;
 
-    spatialMap.hitTest = {
+    spatialMap.hitTest.hits++;
 
-      position: {
 
-        x: position.x,
-        y: position.y,
-        z: position.z
-      },
+    spatialMap.hitTest.position = {
 
-      distance:
-              position.distanceTo(
-                      cameraPosition
-              )
+      x: position.x,
+      y: position.y,
+      z: position.z
     };
+
+
+    spatialMap.hitTest.distance =
+            position.distanceTo(
+                    cameraPosition
+            );
+
+
+    updateHitTestVisual(
+            position
+    );
   }
 
 
   /* ============================================================
-     CAMERA DATA
+     HIT TEST VISUAL
+     ============================================================ */
+
+  function updateHitTestVisual(
+          position
+  ) {
+
+    hitTestGroup.clear();
+
+
+    if (
+            !CONFIG.showHitTest
+    ) {
+
+      return;
+    }
+
+
+    const geometry =
+            new THREE.RingGeometry(
+                    0.06,
+                    0.08,
+                    32
+            );
+
+
+    const material =
+            new THREE.MeshBasicMaterial({
+
+              color: 0xff0000,
+
+              transparent: true,
+
+              opacity: 0.9,
+
+              side: THREE.DoubleSide
+            });
+
+
+    const ring =
+            new THREE.Mesh(
+                    geometry,
+                    material
+            );
+
+
+    ring.rotation.x =
+            -Math.PI / 2;
+
+
+    ring.position.copy(
+            position
+    );
+
+
+    hitTestGroup.add(
+            ring
+    );
+  }
+
+
+  /* ============================================================
+     CAMERA INFORMATION
      ============================================================ */
 
   function updateCameraInfo() {
@@ -1758,19 +2548,24 @@
     const xrCamera =
             renderer.xr.getCamera();
 
+
     const position =
             new THREE.Vector3();
 
+
     const quaternion =
             new THREE.Quaternion();
+
 
     xrCamera.getWorldPosition(
             position
     );
 
+
     xrCamera.getWorldQuaternion(
             quaternion
     );
+
 
     spatialMap.camera.position = {
 
@@ -1778,6 +2573,7 @@
       y: position.y,
       z: position.z
     };
+
 
     spatialMap.camera.quaternion = {
 
@@ -1790,94 +2586,821 @@
 
 
   /* ============================================================
-     XR SESSION
+     SESSION INFORMATION
      ============================================================ */
 
-  async function onSessionStarted(session) {
+  function updateSessionInfo(
+          session
+  ) {
+
+    if (!session) {
+
+      spatialMap.session.active =
+              false;
+
+      return;
+    }
+
+
+    spatialMap.session.active =
+            true;
+
+
+    spatialMap.session.visibilityState =
+            session.visibilityState ||
+            null;
+
+
+    spatialMap.session.environmentBlendMode =
+            session.environmentBlendMode ||
+            null;
+
+
+    spatialMap.session.interactionMode =
+            session.interactionMode ||
+            null;
+
+
+    spatialMap.session.depthUsage =
+            session.depthUsage ||
+            null;
+
+
+    spatialMap.session.depthDataFormat =
+            session.depthDataFormat ||
+            null;
+
+
+    spatialMap.session.inputSources =
+            session.inputSources
+                    ? session.inputSources.length
+                    : 0;
+  }
+
+
+  /* ============================================================
+     INPUT SOURCE DEBUG
+     ============================================================ */
+
+  function getInputSourceInfo(
+          session
+  ) {
+
+    if (!session) {
+      return [];
+    }
+
+
+    const result = [];
+
+
+    for (
+            const source
+            of session.inputSources
+            ) {
+
+      result.push({
+
+        handedness:
+                source.handedness ||
+                null,
+
+        targetRayMode:
+                source.targetRayMode ||
+                null,
+
+        profiles:
+                source.profiles || []
+      });
+    }
+
+
+    return result;
+  }
+
+
+  /* ============================================================
+     DEBUG HTML
+     ============================================================ */
+
+  function updateDebug() {
+
+    const session =
+            renderer.xr.getSession();
+
+
+    updateSessionInfo(
+            session
+    );
+
+
+    const planes =
+            Object.values(
+                    spatialMap.planes
+            );
+
+
+    const floors =
+            planes.filter(
+                    p =>
+                            p.classification ===
+                            "floor"
+            );
+
+
+    const walls =
+            planes.filter(
+                    p =>
+                            p.classification ===
+                            "wall"
+            );
+
+
+    const ceilings =
+            planes.filter(
+                    p =>
+                            p.classification ===
+                            "ceiling"
+            );
+
+
+    const horizontals =
+            planes.filter(
+                    p =>
+                            p.classification ===
+                            "horizontal"
+            );
+
+
+    const camera =
+            spatialMap.camera;
+
+
+    let html = "";
+
+
+    html += `
+        <div>
+            WebXR:
+            <span class="${
+            spatialMap.session.supported
+                    ? "ok"
+                    : "warning"
+    }">
+                ${
+            spatialMap.session.supported
+                    ? "supported"
+                    : "unknown"
+    }
+            </span>
+        </div>
+    `;
+
+
+    html += `
+        <div class="section">
+            XR SESSION
+        </div>
+
+        active:
+        ${spatialMap.session.active}
+
+        <br>
+
+        visibility:
+        ${escapeHtml(
+            spatialMap.session.visibilityState ||
+            "none"
+    )}
+
+        <br>
+
+        blend:
+        ${escapeHtml(
+            spatialMap.session.environmentBlendMode ||
+            "none"
+    )}
+
+        <br>
+
+        interaction:
+        ${escapeHtml(
+            spatialMap.session.interactionMode ||
+            "none"
+    )}
+
+        <br>
+
+        inputSources:
+        ${spatialMap.session.inputSources}
+    `;
+
+
+    html += `
+        <div class="section">
+            FEATURES
+        </div>
+
+        local-floor:
+        <span class="${
+            spatialMap.features.localFloor
+                    ? "ok"
+                    : "warning"
+    }">
+            ${
+            spatialMap.features.localFloor
+                    ? "YES"
+                    : "NO"
+    }
+        </span>
+
+        <br>
+
+        plane-detection:
+        <span class="${
+            spatialMap.features.planeDetection
+                    ? "ok"
+                    : "warning"
+    }">
+            ${
+            spatialMap.features.planeDetection
+                    ? "YES"
+                    : "NO"
+    }
+        </span>
+
+        <br>
+
+        hit-test:
+        <span class="${
+            spatialMap.features.hitTest
+                    ? "ok"
+                    : "warning"
+    }">
+            ${
+            spatialMap.features.hitTest
+                    ? "YES"
+                    : "NO"
+    }
+        </span>
+
+        <br>
+
+        depth-sensing:
+        <span class="${
+            spatialMap.features.depthSensing
+                    ? "ok"
+                    : "warning"
+    }">
+            ${
+            spatialMap.features.depthSensing
+                    ? "YES"
+                    : "NO"
+    }
+        </span>
+    `;
+
+
+    html += `
+        <div class="section">
+            FRAME STATISTICS
+        </div>
+
+        frames:
+        ${spatialMap.frames}
+
+        <br>
+
+        XR frames:
+        ${spatialMap.xrFrames}
+
+        <br>
+
+        render frames:
+        ${spatialMap.renderFrames}
+    `;
+
+
+    html += `
+        <div class="section">
+            CAMERA
+        </div>
+
+        position:
+        ${escapeHtml(
+            vectorText(
+                    camera.position
+            )
+    )}
+
+        <br>
+
+        quaternion:
+        ${escapeHtml(
+            vectorText(
+                    camera.quaternion
+            )
+    )}
+    `;
+
+
+    html += `
+        <div class="section">
+            PLANES
+        </div>
+
+        total:
+        ${planes.length}
+
+        <br>
+
+        floor:
+        ${floors.length}
+
+        <br>
+
+        walls:
+        ${walls.length}
+
+        <br>
+
+        ceiling:
+        ${ceilings.length}
+
+        <br>
+
+        horizontal:
+        ${horizontals.length}
+
+        <br>
+
+        tracked:
+        ${planes.length}
+    `;
+
+
+    html += `
+        <div class="section">
+            DEPTH
+        </div>
+
+        usage:
+        ${escapeHtml(
+            spatialMap.depth.usage ||
+            "none"
+    )}
+
+        <br>
+
+        format:
+        ${escapeHtml(
+            spatialMap.depth.format ||
+            "none"
+    )}
+
+        <br>
+
+        resolution:
+        ${
+            spatialMap.depth.width
+                    ? spatialMap.depth.width +
+                    " × " +
+                    spatialMap.depth.height
+                    : "n/a"
+    }
+
+        <br>
+
+        rawValueToMeters:
+        ${fmt(
+            spatialMap.depth.rawValueToMeters,
+            6
+    )}
+
+        <br>
+
+        depth frames:
+        ${spatialMap.depth.frames}
+
+        <br>
+
+        samples:
+        ${spatialMap.depth.samples}
+
+        <br>
+
+        world points:
+        ${spatialMap.depth.worldPoints}
+    `;
+
+
+    html += `
+        <div class="section">
+            HIT TEST
+        </div>
+
+        available:
+        ${spatialMap.hitTest.available}
+
+        <br>
+
+        hits:
+        ${spatialMap.hitTest.hits}
+    `;
+
+
+    if (
+            spatialMap.hitTest.position
+    ) {
+
+      html += `
+            <br>
+
+            position:
+            ${escapeHtml(
+              vectorText(
+                      spatialMap.hitTest.position
+              )
+      )}
+
+            <br>
+
+            distance:
+            ${fmt(
+              spatialMap.hitTest.distance,
+              3
+      )} m
+        `;
+    }
+
+
+    html += `
+        <div class="section">
+            PLANES DETAIL
+        </div>
+    `;
+
+
+    /*
+     * Largest planes first.
+     */
+
+    planes.sort(
+            (a, b) =>
+                    b.area - a.area
+    );
+
+
+    for (
+            const plane
+            of planes
+            ) {
+
+      const className =
+              plane.classification ===
+              "floor"
+                      ? "floor"
+                      : plane.classification ===
+                      "wall"
+                              ? "wall"
+                              : "other";
+
+
+      html += `
+            <div class="plane ${className}">
+
+                <b>
+                    ${escapeHtml(
+              plane.classification
+      )}
+                </b>
+
+                <br>
+
+                id:
+                ${escapeHtml(
+              plane.id
+      )}
+
+                <br>
+
+                orientation:
+                ${escapeHtml(
+              plane.orientation
+      )}
+
+                <br>
+
+                center:
+                ${escapeHtml(
+              vectorText(
+                      plane.center
+              )
+      )}
+
+                <br>
+
+                normal:
+                ${escapeHtml(
+              vectorText(
+                      plane.normal
+              )
+      )}
+
+                <br>
+
+                vertices:
+                ${plane.vertexCount}
+
+                <br>
+
+                area:
+                ${fmt(
+              plane.area,
+              3
+      )} m²
+
+                <br>
+
+                size:
+                ${fmt(
+              plane.width,
+              3
+      )}
+                ×
+                ${fmt(
+              plane.height,
+              3
+      )}
+                m
+
+                <br>
+
+                updates:
+                ${plane.updates}
+
+                <br>
+
+                lastChangedTime:
+                ${escapeHtml(
+              plane.lastChangedTime ??
+              "n/a"
+      )}
+            </div>
+        `;
+    }
+
+
+    html += `
+        <div class="section">
+            DEPTH CLOUD
+        </div>
+
+        point cloud:
+        ${spatialMap.depth.worldPoints}
+
+        <br>
+
+        max:
+        ${CONFIG.maxDepthPoints}
+
+        <br>
+
+        sample step:
+        ${CONFIG.depthSampleStep}
+
+        <br>
+
+        max distance:
+        ${CONFIG.depthMaxDistance} m
+    `;
+
+
+    if (session) {
+
+      const inputs =
+              getInputSourceInfo(
+                      session
+              );
+
+
+      html += `
+            <div class="section">
+                INPUT SOURCES
+            </div>
+        `;
+
+
+      for (
+              const input
+              of inputs
+              ) {
+
+        html += `
+                handedness:
+                ${escapeHtml(
+                input.handedness
+        )}
+
+                <br>
+
+                targetRayMode:
+                ${escapeHtml(
+                input.targetRayMode
+        )}
+
+                <br>
+
+                profiles:
+                ${escapeHtml(
+                input.profiles.join(
+                        ", "
+                )
+        )}
+
+                <br><br>
+            `;
+      }
+    }
+
+
+    debugContent.innerHTML =
+            html;
+  }
+
+
+  /* ============================================================
+     START XR
+     ============================================================ */
+
+  async function onSessionStarted(
+          session
+  ) {
+
+    currentSession =
+            session;
+
 
     spatialMap.startedAt =
             new Date().toISOString();
 
-    await initializeHitTest(
+
+    spatialMap.features.localFloor =
+            true;
+
+
+    spatialMap.session.active =
+            true;
+
+
+    updateSessionInfo(
             session
     );
+
 
     session.addEventListener(
             "end",
             onSessionEnded
     );
 
-    console.log(
-            "XR SESSION STARTED",
+
+    await initializeHitTest(
             session
     );
 
-    console.log(
-            "environmentBlendMode:",
-            session.environmentBlendMode
-    );
 
     console.log(
-            "depthUsage:",
+            "[SpatialScanner] XR session started"
+    );
+
+
+    console.log(
+            "[SpatialScanner] session:",
+            session
+    );
+
+
+    console.log(
+            "[SpatialScanner] depthUsage:",
             session.depthUsage
     );
 
+
     console.log(
-            "depthDataFormat:",
+            "[SpatialScanner] depthDataFormat:",
             session.depthDataFormat
     );
 
-    updateDebug();
-  }
-
-
-  function onSessionEnded() {
-
-    hitTestSource = null;
 
     console.log(
-            "XR SESSION ENDED"
+            "[SpatialScanner] inputSources:",
+            getInputSourceInfo(
+                    session
+            )
     );
+
 
     updateDebug();
   }
 
 
   /* ============================================================
-     AR BUTTON
+     END XR
+     ============================================================ */
+
+  function onSessionEnded() {
+
+    currentSession =
+            null;
+
+
+    hitTestSource =
+            null;
+
+
+    viewerSpace =
+            null;
+
+
+    spatialMap.session.active =
+            false;
+
+
+    spatialMap.features.hitTest =
+            false;
+
+
+    spatialMap.features.depthSensing =
+            false;
+
+
+    spatialMap.hitTest.available =
+            false;
+
+
+    console.log(
+            "[SpatialScanner] XR session ended"
+    );
+
+
+    updateDebug();
+  }
+
+
+  /* ============================================================
+     AR SESSION OPTIONS
      ============================================================ */
 
   const sessionInit = {
 
     requiredFeatures: [
+
       "local-floor",
+
       "plane-detection"
     ],
 
+
     optionalFeatures: [
+
       "hit-test",
+
       "depth-sensing",
+
       "dom-overlay"
     ],
 
+
     domOverlay: {
-      root: document.body
+
+      root:
+      document.body
     },
+
 
     depthSensing: {
 
       usagePreference: [
+
         "cpu-optimized",
+
         "gpu-optimized"
       ],
 
+
       dataFormatPreference: [
+
         "luminance-alpha",
+
         "float32"
       ]
     }
   };
 
+
+  /* ============================================================
+     AR BUTTON
+     ============================================================ */
 
   const arButton =
           ARButton.createButton(
@@ -1885,193 +3408,333 @@
                   sessionInit
           );
 
+
   document.body.appendChild(
           arButton
   );
 
 
   /* ============================================================
-     SESSION WATCH
+     XR SUPPORT CHECK
      ============================================================ */
 
-  let previousSession = null;
+  async function checkWebXR() {
 
+    if (
+            !navigator.xr
+    ) {
+
+      spatialMap.session.supported =
+              false;
+
+
+      debugContent.innerHTML = `
+
+            <div class="error">
+                WebXR is not available.
+            </div>
+
+            <br>
+
+            navigator.xr =
+            undefined
+
+            <br><br>
+
+            Use a WebXR-compatible mobile
+            browser and HTTPS.
+        `;
+
+      return;
+    }
+
+
+    try {
+
+      const supported =
+              await navigator.xr
+                      .isSessionSupported(
+                              "immersive-ar"
+                      );
+
+
+      spatialMap.session.supported =
+              supported;
+
+
+      if (!supported) {
+
+        debugContent.innerHTML = `
+
+                <div class="warning">
+                    immersive-ar is not supported
+                </div>
+
+                <br>
+
+                WebXR exists, but this browser/device
+                cannot start immersive AR.
+            `;
+
+        return;
+      }
+
+
+      debugContent.innerHTML = `
+
+            <div class="ok">
+                immersive-ar supported
+            </div>
+
+            <br>
+
+            Press the AR button.
+
+            <br><br>
+
+            Move the camera slowly around the room
+            to allow the device to detect surfaces.
+        `;
+
+
+    }
+    catch (error) {
+
+      console.error(
+              error
+      );
+
+
+      debugContent.innerHTML = `
+
+            <div class="error">
+                WebXR support check failed
+            </div>
+
+            <br>
+
+            ${escapeHtml(
+              error.message ||
+              String(error)
+      )}
+        `;
+    }
+  }
+
+
+  checkWebXR();
+
+
+  /* ============================================================
+     XR SESSION DETECTION
+     ============================================================ */
 
   function checkSession() {
 
     const session =
             renderer.xr.getSession();
 
+
     if (
             session &&
-            session !== previousSession
+            session !== currentSession
     ) {
-
-      previousSession =
-              session;
 
       onSessionStarted(
               session
       );
     }
-
-    if (
-            !session &&
-            previousSession
-    ) {
-
-      previousSession = null;
-
-      onSessionEnded();
-    }
   }
 
 
   /* ============================================================
-     ANIMATION
+     MAIN RENDER LOOP
      ============================================================ */
 
-  renderer.setAnimationLoop(
-          function () {
+  function render(
+          time,
+          frame
+  ) {
 
-            spatialMap.frames++;
+    spatialMap.frames++;
 
-            checkSession();
+    spatialMap.renderFrames++;
 
-            const frame =
-                    renderer.xr.getFrame();
 
-            if (frame) {
+    checkSession();
 
-              try {
 
-                updatePlanes(frame);
+    const xrFrame =
+            frame ||
+            renderer.xr.getFrame();
 
-              }
-              catch (error) {
 
-                console.error(
-                        "Plane update error:",
-                        error
-                );
-              }
+    if (
+            xrFrame
+    ) {
 
-              try {
+      spatialMap.xrFrames++;
 
-                updateHitTest(frame);
 
-              }
-              catch (error) {
+      try {
 
-                console.error(
-                        "Hit test error:",
-                        error
-                );
-              }
+        updatePlanes(
+                xrFrame
+        );
 
-              try {
+      }
+      catch (error) {
 
-                collectDepth(frame);
+        console.error(
+                "[SpatialScanner] plane error:",
+                error
+        );
+      }
 
-              }
-              catch (error) {
 
-                console.error(
-                        "Depth error:",
-                        error
-                );
-              }
-            }
+      try {
 
-            updateCameraInfo();
+        updateHitTest(
+                xrFrame
+        );
 
-            /*
-             * Rebuild floor grid when
-             * floor information becomes available.
-             */
+      }
+      catch (error) {
 
-            if (
-                    spatialMap.frames % 30 === 0
-            ) {
+        console.error(
+                "[SpatialScanner] hit test error:",
+                error
+        );
+      }
 
-              rebuildFloorGrid();
 
-              updateDepthVisualisation();
+      try {
 
-              updateDebug();
-            }
+        collectDepth(
+                xrFrame
+        );
 
-            renderer.render(
-                    scene,
-                    camera
-            );
-          }
-  );
+      }
+      catch (error) {
+
+        console.error(
+                "[SpatialScanner] depth error:",
+                error
+        );
+      }
+    }
+
+
+    try {
+
+      updateCameraInfo();
+
+    }
+    catch (error) {
+
+      console.error(
+              "[SpatialScanner] camera error:",
+              error
+      );
+    }
+
+
+    spatialMap.lastUpdate =
+            new Date().toISOString();
+
+
+    if (
+            spatialMap.frames %
+            CONFIG.debugUpdateInterval ===
+            0
+    ) {
+
+      updateDebug();
+    }
+
+
+    renderer.render(
+            scene,
+            camera
+    );
+  }
 
 
   /* ============================================================
-     EXPORT
+     EXPORT SPATIAL MAP
      ============================================================ */
 
-  function buildExportObject() {
+  function buildExportData() {
 
     return {
 
-      version: 1,
+      ...spatialMap,
 
-      type: "webxr-spatial-map",
-
-      generatedAt:
+      exportedAt:
               new Date().toISOString(),
 
-      startedAt:
-      spatialMap.startedAt,
-
       statistics: {
-
-        frames:
-        spatialMap.frames,
 
         planes:
         Object.keys(
                 spatialMap.planes
         ).length,
 
-        depthFrames:
-        spatialMap.depthFrames,
+        floors:
+        Object.values(
+                spatialMap.planes
+        )
+                .filter(
+                        p =>
+                                p.classification ===
+                                "floor"
+                )
+                .length,
+
+        walls:
+        Object.values(
+                spatialMap.planes
+        )
+                .filter(
+                        p =>
+                                p.classification ===
+                                "wall"
+                )
+                .length,
+
+        ceiling:
+        Object.values(
+                spatialMap.planes
+        )
+                .filter(
+                        p =>
+                                p.classification ===
+                                "ceiling"
+                )
+                .length,
 
         depthPoints:
-        spatialMap.points.length,
-
-        hitTests:
-        spatialMap.hitTests
-      },
-
-      camera:
-      spatialMap.camera,
-
-      planes:
-              Object.values(
-                      spatialMap.planes
-              ),
-
-      depthSamples:
-      spatialMap.points,
-
-      hitTest:
-      spatialMap.hitTest
+        spatialMap.depth.worldPoints
+      }
     };
   }
 
 
+  /* ============================================================
+     EXPORT BUTTON
+     ============================================================ */
+
   document
-          .getElementById("jsonButton")
+          .getElementById(
+                  "exportButton"
+          )
           .addEventListener(
                   "click",
                   () => {
 
                     const data =
-                            buildExportObject();
+                            buildExportData();
+
 
                     const json =
                             JSON.stringify(
@@ -2080,16 +3743,12 @@
                                     2
                             );
 
+
                     console.log(
-                            "SPATIAL MAP:",
+                            "[SpatialScanner] SPATIAL MAP:",
                             data
                     );
 
-                    /*
-                     * On mobile this opens the generated
-                     * JSON instead of relying on a broken
-                     * download mechanism.
-                     */
 
                     const blob =
                             new Blob(
@@ -2100,31 +3759,158 @@
                                     }
                             );
 
+
                     const url =
                             URL.createObjectURL(
                                     blob
                             );
 
-                    const a =
+
+                    const anchor =
                             document.createElement(
                                     "a"
                             );
 
-                    a.href = url;
 
-                    a.download =
-                            "spatial-map.json";
+                    anchor.href =
+                            url;
 
-                    a.click();
+
+                    anchor.download =
+                            "webxr-spatial-map.json";
+
+
+                    document.body.appendChild(
+                            anchor
+                    );
+
+
+                    anchor.click();
+
+
+                    anchor.remove();
+
 
                     setTimeout(
                             () => {
-                              URL.revokeObjectURL(url);
+
+                              URL.revokeObjectURL(
+                                      url
+                              );
+
                             },
                             1000
                     );
                   }
           );
+
+
+  /* ============================================================
+     CLEAR DEPTH CLOUD
+     ============================================================ */
+
+  document
+          .getElementById(
+                  "clearButton"
+          )
+          .addEventListener(
+                  "click",
+                  () => {
+
+                    spatialMap.depth.samples =
+                            0;
+
+                    spatialMap.depth.worldPoints =
+                            0;
+
+                    depthGeometry.setDrawRange(
+                            0,
+                            0
+                    );
+
+
+                    depthGeometry
+                            .getAttribute(
+                                    "position"
+                            )
+                            .needsUpdate = true;
+
+
+                    console.log(
+                            "[SpatialScanner] point cloud cleared"
+                    );
+
+
+                    updateDebug();
+                  }
+          );
+
+
+  /* ============================================================
+     GLOBAL DEBUG API
+     ============================================================ */
+
+  window.spatialMap =
+          spatialMap;
+
+
+  window.exportSpatialMap =
+          buildExportData;
+
+
+  window.spatialScanner = {
+
+    getMap() {
+
+      return spatialMap;
+    },
+
+
+    getPlanes() {
+
+      return Object.values(
+              spatialMap.planes
+      );
+    },
+
+
+    getFloorPlanes() {
+
+      return Object.values(
+              spatialMap.planes
+      )
+              .filter(
+                      p =>
+                              p.classification ===
+                              "floor"
+              );
+    },
+
+
+    getWalls() {
+
+      return Object.values(
+              spatialMap.planes
+      )
+              .filter(
+                      p =>
+                              p.classification ===
+                              "wall"
+              );
+    },
+
+
+    getDepthPointCount() {
+
+      return spatialMap.depth.worldPoints;
+    },
+
+
+    export() {
+
+      return buildExportData();
+    }
+  };
 
 
   /* ============================================================
@@ -2139,7 +3925,9 @@
                     window.innerWidth /
                     window.innerHeight;
 
+
             camera.updateProjectionMatrix();
+
 
             renderer.setSize(
                     window.innerWidth,
@@ -2150,112 +3938,29 @@
 
 
   /* ============================================================
-     INITIAL DIAGNOSTICS
-     ============================================================ */
-
-  async function checkWebXR() {
-
-    if (!navigator.xr) {
-
-      debugElement.innerHTML = `
-            <div class="error">
-                WebXR is not available.
-            </div>
-
-            <div>
-                navigator.xr = undefined
-            </div>
-
-            <div>
-                Use a compatible mobile/headset browser
-                over HTTPS.
-            </div>
-        `;
-
-      return;
-    }
-
-    let arSupported = false;
-
-    try {
-
-      arSupported =
-              await navigator.xr.isSessionSupported(
-                      "immersive-ar"
-              );
-
-    }
-    catch (error) {
-
-      console.error(error);
-    }
-
-    debugElement.innerHTML = `
-
-        <div class="${
-            arSupported
-                    ? "ok"
-                    : "warning"
-    }">
-
-            immersive-ar:
-            ${arSupported}
-
-        </div>
-
-        <div class="section">
-            FEATURES REQUESTED
-        </div>
-
-        local-floor
-        <br>
-        plane-detection
-        <br>
-        hit-test
-        <br>
-        depth-sensing
-
-        <div class="section">
-            START AR
-        </div>
-
-        Press the AR button and slowly scan
-        the room with the camera.
-
-    `;
-  }
-
-
-  checkWebXR();
-
-
-  /* ============================================================
-     GLOBAL DEBUG ACCESS
-     ============================================================ */
-
-  window.spatialMap =
-          spatialMap;
-
-  window.exportSpatialMap =
-          buildExportObject;
-
-
-  /* ============================================================
-     LOG
+     INITIAL LOG
      ============================================================ */
 
   console.log(
-          "%cWebXR Spatial Scanner",
-          "font-size:20px;font-weight:bold"
+          "%cWEBXR SPATIAL SCANNER",
+          "font-size:18px;font-weight:bold"
   );
 
+
   console.log(
-          "Spatial map is available as:",
+          "Spatial map:",
           "window.spatialMap"
   );
 
+
   console.log(
-          "Export function:",
+          "Scanner API:",
+          "window.spatialScanner"
+  );
+
+
+  console.log(
+          "Export:",
           "window.exportSpatialMap()"
   );
 
