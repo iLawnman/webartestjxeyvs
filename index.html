@@ -1,98 +1,2265 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
-  <title>AR — Hiro + asset.png</title>
+  <meta
+          name="viewport"
+          content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+  >
 
-  <!-- Three.js -->
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
-
-  <!-- AR.js (Three.js версия) -->
-  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/three.js/build/ar-threex.js"></script>
+  <title>WebXR Spatial Scanner</title>
 
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body {
+    html,
+    body {
+      margin: 0;
+      padding: 0;
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background: #000;
-      font-family: system-ui, -apple-system, sans-serif;
-    }
-
-    /* Камера на весь экран */
-    video {
-      position: fixed !important;
-      top: 0 !important;
-      left: 0 !important;
-      width: 100% !important;
-      height: 100% !important;
-      object-fit: cover !important;
-      z-index: 0 !important;
+      background: #111;
+      font-family: monospace;
     }
 
     canvas {
-      position: fixed !important;
-      top: 0 !important;
-      left: 0 !important;
-      width: 100% !important;
-      height: 100% !important;
-      z-index: 1 !important;
+      display: block;
     }
 
-    #loader {
+    #ui {
       position: fixed;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #111;
-      color: #fff;
-      z-index: 20;
-      font-size: 18px;
-    }
+      top: 0;
+      left: 0;
+      right: 0;
 
-    /* Статус в правом верхнем углу */
-    #status {
-      position: fixed;
-      top: 12px;
-      right: 12px;
-      z-index: 15;
-      background: rgba(0, 0, 0, 0.7);
-      color: #fff;
-      padding: 10px 14px;
-      border-radius: 10px;
-      font-size: 13px;
-      line-height: 1.5;
-      min-width: 160px;
-      backdrop-filter: blur(6px);
-      border: 1px solid rgba(255,255,255,0.15);
+      max-height: 55vh;
+      overflow: auto;
+
+      padding: 10px;
+
+      color: #d8ffd8;
+      background: rgba(0, 0, 0, 0.78);
+
+      font-size: 11px;
+      line-height: 1.35;
+
       pointer-events: none;
-      user-select: none;
+
+      z-index: 1000;
     }
-    #status .row {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
+
+    #ui .title {
+      color: white;
+      font-size: 14px;
+      font-weight: bold;
+      margin-bottom: 6px;
     }
-    #status .label { opacity: 0.7; }
-    #status .value { font-weight: 600; }
-    #status .ok { color: #4ade80; }
-    #status .search { color: #fbbf24; }
-    #status .err { color: #f87171; }
+
+    #ui .section {
+      color: #fff;
+      margin-top: 7px;
+      border-bottom: 1px solid rgba(255,255,255,0.15);
+      padding-bottom: 2px;
+    }
+
+    #ui .warning {
+      color: #ffd080;
+    }
+
+    #ui .error {
+      color: #ff8080;
+    }
+
+    #ui .ok {
+      color: #80ff80;
+    }
+
+    #jsonButton {
+      position: fixed;
+
+      right: 10px;
+      bottom: 10px;
+
+      z-index: 2000;
+
+      padding: 10px 14px;
+
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 6px;
+
+      color: white;
+      background: rgba(0,0,0,0.75);
+
+      font-family: monospace;
+      font-size: 12px;
+    }
+
+    #jsonButton:active {
+      background: rgba(255,255,255,0.2);
+    }
   </style>
 </head>
+
 <body>
-  <div id="loader">Загрузка камеры…</div>
 
-  <div id="status">
-    <div class="row"><span class="label">AR</span><span class="value" id="st-ar">загрузка…</span></div>
-    <div class="row"><span class="label">Маркер</span><span class="value" id="st-marker">—</span></div>
-    <div class="row"><span class="label">FPS</span><span class="value" id="st-fps">—</span></div>
-  </div>
+<div id="ui">
+  <div class="title">WEBXR SPATIAL SCANNER</div>
+  <div id="debug">Waiting for XR...</div>
+</div>
 
-  <script src="tree.js"></script>
-  <script src="ar.js"></script>
+<button id="jsonButton">
+  EXPORT JSON
+</button>
+
+<script type="module">
+
+  import * as THREE from
+            "https://cdn.jsdelivr.net/npm/three@0.179.1/build/three.module.js";
+
+  import { ARButton } from
+            "https://cdn.jsdelivr.net/npm/three@0.179.1/examples/jsm/webxr/ARButton.js";
+
+
+  /* ============================================================
+     CONFIG
+     ============================================================ */
+
+  const CONFIG = {
+
+    planeHeightThreshold: 0.15,
+
+    showPlanes: true,
+    showPlaneEdges: true,
+    showPlaneNormals: true,
+    showPlaneCenters: true,
+
+    showFloorGrid: true,
+
+    collectDepthPoints: true,
+
+    depthSampleStep: 8,
+
+    maxDepthPoints: 10000,
+
+    pointSize: 0.012,
+
+    normalLength: 0.25,
+
+    floorGridSize: 20,
+    floorGridStep: 0.25
+  };
+
+
+  /* ============================================================
+     THREE
+     ============================================================ */
+
+  const scene = new THREE.Scene();
+
+  const camera = new THREE.PerspectiveCamera(
+          70,
+          window.innerWidth / window.innerHeight,
+          0.01,
+          100
+  );
+
+  const renderer = new THREE.WebGLRenderer({
+    antialias: true,
+    alpha: true
+  });
+
+  renderer.setPixelRatio(
+          Math.min(window.devicePixelRatio, 2)
+  );
+
+  renderer.setSize(
+          window.innerWidth,
+          window.innerHeight
+  );
+
+  renderer.xr.enabled = true;
+
+  renderer.xr.setReferenceSpaceType("local-floor");
+
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+  document.body.appendChild(renderer.domElement);
+
+
+  /* ============================================================
+     LIGHT
+     ============================================================ */
+
+  scene.add(
+          new THREE.HemisphereLight(
+                  0xffffff,
+                  0x444444,
+                  1.5
+          )
+  );
+
+
+  /* ============================================================
+     DEBUG GROUPS
+     ============================================================ */
+
+  const planeGroup = new THREE.Group();
+
+  const normalGroup = new THREE.Group();
+
+  const centerGroup = new THREE.Group();
+
+  const pointCloudGroup = new THREE.Group();
+
+  const floorGridGroup = new THREE.Group();
+
+  scene.add(planeGroup);
+  scene.add(normalGroup);
+  scene.add(centerGroup);
+  scene.add(pointCloudGroup);
+  scene.add(floorGridGroup);
+
+
+  /* ============================================================
+     SPATIAL DATA
+     ============================================================ */
+
+  const spatialMap = {
+
+    startedAt: null,
+
+    frames: 0,
+
+    planesDetected: 0,
+
+    planesAdded: 0,
+
+    planesUpdated: 0,
+
+    planesRemoved: 0,
+
+    depthFrames: 0,
+
+    depthPoints: 0,
+
+    hitTests: 0,
+
+    floorPlanes: 0,
+
+    wallPlanes: 0,
+
+    horizontalPlanes: 0,
+
+    verticalPlanes: 0,
+
+    otherPlanes: 0,
+
+    camera: {
+      position: {
+        x: 0,
+        y: 0,
+        z: 0
+      },
+
+      quaternion: {
+        x: 0,
+        y: 0,
+        z: 0,
+        w: 1
+      }
+    },
+
+    planes: {},
+
+    points: [],
+
+    hitTest: null
+  };
+
+
+  /* ============================================================
+     PLANE VISUAL OBJECT
+     ============================================================ */
+
+  const planeObjects = new Map();
+
+
+  /* ============================================================
+     MATERIALS
+     ============================================================ */
+
+  const planeMaterial = new THREE.MeshBasicMaterial({
+
+    color: 0x00ff88,
+
+    transparent: true,
+
+    opacity: 0.16,
+
+    side: THREE.DoubleSide,
+
+    depthWrite: false
+  });
+
+
+  const planeLineMaterial =
+          new THREE.LineBasicMaterial({
+
+            color: 0x00ff88,
+
+            transparent: true,
+
+            opacity: 0.8
+          });
+
+
+  const normalMaterial =
+          new THREE.LineBasicMaterial({
+
+            color: 0xff4444
+          });
+
+
+  const centerMaterial =
+          new THREE.MeshBasicMaterial({
+
+            color: 0xffff00
+          });
+
+
+  /* ============================================================
+     UI
+     ============================================================ */
+
+  const debugElement =
+          document.getElementById("debug");
+
+
+  function escapeHtml(value) {
+
+    return String(value)
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;");
+  }
+
+
+  function fmt(value, digits = 3) {
+
+    if (!Number.isFinite(value)) {
+      return "n/a";
+    }
+
+    return Number(value).toFixed(digits);
+  }
+
+
+  function vectorString(v) {
+
+    return `(${fmt(v.x)}, ${fmt(v.y)}, ${fmt(v.z)})`;
+  }
+
+
+  function updateDebug(extra = "") {
+
+    const session =
+            renderer.xr.getSession();
+
+    const referenceSpace =
+            renderer.xr.getReferenceSpace();
+
+    let sessionInfo = "no session";
+
+    if (session) {
+
+      sessionInfo = `
+            <div>
+                XR mode:
+                <span class="ok">
+                    ${escapeHtml(session.visibilityState || "unknown")}
+                </span>
+            </div>
+
+            <div>
+                depthUsage:
+                ${escapeHtml(session.depthUsage || "none")}
+            </div>
+
+            <div>
+                depthDataFormat:
+                ${escapeHtml(session.depthDataFormat || "none")}
+            </div>
+
+            <div>
+                inputSources:
+                ${session.inputSources.length}
+            </div>
+        `;
+    }
+
+    const planes =
+            Object.values(spatialMap.planes);
+
+    const floor =
+            planes.filter(p => p.classification === "floor").length;
+
+    const walls =
+            planes.filter(p => p.classification === "wall").length;
+
+    const horizontal =
+            planes.filter(p => p.orientation === "horizontal").length;
+
+    const vertical =
+            planes.filter(p => p.orientation === "vertical").length;
+
+    const points =
+            spatialMap.points.length;
+
+    let planeDetails = "";
+
+    for (const plane of planes) {
+
+      planeDetails += `
+            <div style="margin-top:5px">
+                <b>${escapeHtml(plane.classification)}</b>
+                id=${escapeHtml(plane.id)}
+
+                <br>
+                orientation=${escapeHtml(plane.orientation)}
+
+                <br>
+                center=${escapeHtml(
+              vectorString(plane.center)
+      )}
+
+                <br>
+                normal=${escapeHtml(
+              vectorString(plane.normal)
+      )}
+
+                <br>
+                vertices=${plane.vertexCount}
+
+                <br>
+                area=${fmt(plane.area, 3)} m²
+
+                <br>
+                size=${fmt(plane.width, 3)}
+                ×
+                ${fmt(plane.height, 3)} m
+
+                <br>
+                updates=${plane.updates}
+            </div>
+        `;
+    }
+
+    debugElement.innerHTML = `
+
+        ${sessionInfo}
+
+        <div class="section">
+            SESSION
+        </div>
+
+        frames=${spatialMap.frames}
+        <br>
+        referenceSpace=${referenceSpace ? "yes" : "no"}
+
+        <div class="section">
+            PLANES
+        </div>
+
+        detected=${spatialMap.planesDetected}
+        <br>
+        tracked=${planes.length}
+        <br>
+        floor=${floor}
+        <br>
+        walls=${walls}
+        <br>
+        horizontal=${horizontal}
+        <br>
+        vertical=${vertical}
+        <br>
+        added=${spatialMap.planesAdded}
+        <br>
+        updated=${spatialMap.planesUpdated}
+        <br>
+        removed=${spatialMap.planesRemoved}
+
+        <div class="section">
+            DEPTH
+        </div>
+
+        depthFrames=${spatialMap.depthFrames}
+        <br>
+        points=${points}
+
+        <div class="section">
+            CAMERA
+        </div>
+
+        position=${escapeHtml(
+            vectorString(
+                    new THREE.Vector3(
+                            spatialMap.camera.position.x,
+                            spatialMap.camera.position.y,
+                            spatialMap.camera.position.z
+                    )
+            )
+    )}
+
+        <div class="section">
+            HIT TEST
+        </div>
+
+        ${
+            spatialMap.hitTest
+                    ? `
+                    position=${
+                            escapeHtml(
+                                    vectorString(
+                                            spatialMap.hitTest.position
+                                    )
+                            )
+                    }
+
+                    <br>
+                    distance=${
+                            fmt(
+                                    spatialMap.hitTest.distance,
+                                    3
+                            )
+                    } m
+                `
+                    : "no result"
+    }
+
+        <div class="section">
+            PLANES DETAIL
+        </div>
+
+        ${planeDetails}
+
+        ${extra}
+    `;
+  }
+
+
+  /* ============================================================
+     PLANE CLASSIFICATION
+     ============================================================ */
+
+  function classifyPlane(
+          plane,
+          pose,
+          referenceSpace
+  ) {
+
+    const orientation =
+            plane.orientation || "unknown";
+
+    if (!pose) {
+
+      return {
+        classification: orientation
+      };
+    }
+
+    const position =
+            pose.transform.position;
+
+    const y =
+            position.y;
+
+    if (orientation === "vertical") {
+
+      return {
+        classification: "wall"
+      };
+    }
+
+    if (orientation === "horizontal") {
+
+      /*
+       * local-floor usually places floor close to Y = 0.
+       *
+       * Do not assume every horizontal plane is floor.
+       */
+
+      if (Math.abs(y) < CONFIG.planeHeightThreshold) {
+
+        return {
+          classification: "floor"
+        };
+      }
+
+      return {
+        classification: "horizontal"
+      };
+    }
+
+    return {
+      classification: "other"
+    };
+  }
+
+
+  /* ============================================================
+     POLYGON AREA
+     ============================================================ */
+
+  function polygonArea(points) {
+
+    if (!points || points.length < 3) {
+
+      return 0;
+    }
+
+    let area = 0;
+
+    for (let i = 0; i < points.length; i++) {
+
+      const a = points[i];
+
+      const b =
+              points[(i + 1) % points.length];
+
+      area +=
+              a.x * b.y -
+              b.x * a.y;
+    }
+
+    return Math.abs(area) * 0.5;
+  }
+
+
+  /* ============================================================
+     PLANE GEOMETRY
+     ============================================================ */
+
+  function buildPlaneObject(
+          plane,
+          pose,
+          planeData
+  ) {
+
+    const vertices =
+            plane.polygon;
+
+    if (!vertices || vertices.length < 3) {
+
+      return null;
+    }
+
+    const shape =
+            new THREE.Shape();
+
+    shape.moveTo(
+            vertices[0].x,
+            vertices[0].z
+    );
+
+    for (
+            let i = 1;
+            i < vertices.length;
+            i++
+    ) {
+
+      shape.lineTo(
+              vertices[i].x,
+              vertices[i].z
+      );
+    }
+
+    shape.closePath();
+
+    const geometry =
+            new THREE.ShapeGeometry(shape);
+
+    const mesh =
+            new THREE.Mesh(
+                    geometry,
+                    planeMaterial.clone()
+            );
+
+    mesh.rotation.x = -Math.PI / 2;
+
+    mesh.position.set(
+            pose.transform.position.x,
+            pose.transform.position.y,
+            pose.transform.position.z
+    );
+
+    mesh.quaternion.set(
+            pose.transform.orientation.x,
+            pose.transform.orientation.y,
+            pose.transform.orientation.z,
+            pose.transform.orientation.w
+    );
+
+    mesh.userData.planeId =
+            planeData.id;
+
+    return mesh;
+  }
+
+
+  /* ============================================================
+     PLANE EDGES
+     ============================================================ */
+
+  function buildPlaneEdges(
+          plane,
+          pose
+  ) {
+
+    const points =
+            plane.polygon;
+
+    if (!points || points.length < 2) {
+
+      return null;
+    }
+
+    const geometry =
+            new THREE.BufferGeometry();
+
+    const vertices = [];
+
+    for (
+            let i = 0;
+            i < points.length;
+            i++
+    ) {
+
+      const a = points[i];
+
+      const b =
+              points[(i + 1) % points.length];
+
+      vertices.push(
+              a.x,
+              0,
+              a.z,
+
+              b.x,
+              0,
+              b.z
+      );
+    }
+
+    geometry.setAttribute(
+            "position",
+            new THREE.Float32BufferAttribute(
+                    vertices,
+                    3
+            )
+    );
+
+    const lines =
+            new THREE.LineSegments(
+                    geometry,
+                    planeLineMaterial.clone()
+            );
+
+    lines.position.set(
+            pose.transform.position.x,
+            pose.transform.position.y,
+            pose.transform.position.z
+    );
+
+    lines.quaternion.set(
+            pose.transform.orientation.x,
+            pose.transform.orientation.y,
+            pose.transform.orientation.z,
+            pose.transform.orientation.w
+    );
+
+    return lines;
+  }
+
+
+  /* ============================================================
+     PLANE NORMAL
+     ============================================================ */
+
+  function buildNormal(
+          plane,
+          pose
+  ) {
+
+    const origin =
+            new THREE.Vector3(
+                    pose.transform.position.x,
+                    pose.transform.position.y,
+                    pose.transform.position.z
+            );
+
+    const quaternion =
+            new THREE.Quaternion(
+                    pose.transform.orientation.x,
+                    pose.transform.orientation.y,
+                    pose.transform.orientation.z,
+                    pose.transform.orientation.w
+            );
+
+    const normal =
+            new THREE.Vector3(
+                    0,
+                    1,
+                    0
+            ).applyQuaternion(quaternion)
+                    .normalize();
+
+    const end =
+            origin.clone().add(
+                    normal.clone()
+                            .multiplyScalar(
+                                    CONFIG.normalLength
+                            )
+            );
+
+    const geometry =
+            new THREE.BufferGeometry().setFromPoints([
+              origin,
+              end
+            ]);
+
+    return new THREE.Line(
+            geometry,
+            normalMaterial
+    );
+  }
+
+
+  /* ============================================================
+     PLANE CENTER
+     ============================================================ */
+
+  function buildCenter(
+          pose
+  ) {
+
+    const geometry =
+            new THREE.SphereGeometry(
+                    0.025,
+                    8,
+                    8
+            );
+
+    const mesh =
+            new THREE.Mesh(
+                    geometry,
+                    centerMaterial
+            );
+
+    mesh.position.set(
+            pose.transform.position.x,
+            pose.transform.position.y,
+            pose.transform.position.z
+    );
+
+    return mesh;
+  }
+
+
+  /* ============================================================
+     UPDATE PLANES
+     ============================================================ */
+
+  function updatePlanes(frame) {
+
+    const detectedPlanes =
+            frame.detectedPlanes;
+
+    if (!detectedPlanes) {
+
+      return;
+    }
+
+    spatialMap.planesDetected =
+            detectedPlanes.size;
+
+    const referenceSpace =
+            renderer.xr.getReferenceSpace();
+
+    if (!referenceSpace) {
+
+      return;
+    }
+
+    const currentlyVisible =
+            new Set();
+
+    for (const plane of detectedPlanes) {
+
+      const id =
+              getPlaneId(plane);
+
+      currentlyVisible.add(id);
+
+      const pose =
+              frame.getPose(
+                      plane.planeSpace,
+                      referenceSpace
+              );
+
+      if (!pose) {
+
+        continue;
+      }
+
+      const classification =
+              classifyPlane(
+                      plane,
+                      pose,
+                      referenceSpace
+              );
+
+      const points =
+              plane.polygon || [];
+
+      const area =
+              polygonArea(points);
+
+      const bounds =
+              getPolygonBounds(points);
+
+      let data =
+              spatialMap.planes[id];
+
+      if (!data) {
+
+        data = {
+
+          id,
+
+          orientation:
+                  plane.orientation || "unknown",
+
+          classification:
+          classification.classification,
+
+          center: {
+            x: 0,
+            y: 0,
+            z: 0
+          },
+
+          normal: {
+            x: 0,
+            y: 0,
+            z: 0
+          },
+
+          vertexCount: 0,
+
+          area: 0,
+
+          width: 0,
+
+          height: 0,
+
+          updates: 0
+        };
+
+        spatialMap.planes[id] =
+                data;
+
+        spatialMap.planesAdded++;
+      }
+      else {
+
+        spatialMap.planesUpdated++;
+      }
+
+      data.orientation =
+              plane.orientation || "unknown";
+
+      data.classification =
+              classification.classification;
+
+      data.vertexCount =
+              points.length;
+
+      data.area =
+              area;
+
+      data.width =
+              bounds.width;
+
+      data.height =
+              bounds.height;
+
+      data.center = {
+
+        x: pose.transform.position.x,
+
+        y: pose.transform.position.y,
+
+        z: pose.transform.position.z
+      };
+
+      const q =
+              new THREE.Quaternion(
+                      pose.transform.orientation.x,
+                      pose.transform.orientation.y,
+                      pose.transform.orientation.z,
+                      pose.transform.orientation.w
+              );
+
+      const normal =
+              new THREE.Vector3(
+                      0,
+                      1,
+                      0
+              ).applyQuaternion(q)
+                      .normalize();
+
+      data.normal = {
+
+        x: normal.x,
+        y: normal.y,
+        z: normal.z
+      };
+
+      data.updates++;
+
+
+      /* --------------------------------------------
+         CREATE / RECREATE VISUAL
+         -------------------------------------------- */
+
+      let visual =
+              planeObjects.get(id);
+
+      if (visual) {
+
+        planeGroup.remove(
+                visual.mesh
+        );
+
+        if (visual.edges) {
+
+          planeGroup.remove(
+                  visual.edges
+          );
+        }
+
+        if (visual.normal) {
+
+          normalGroup.remove(
+                  visual.normal
+          );
+        }
+
+        if (visual.center) {
+
+          centerGroup.remove(
+                  visual.center
+          );
+        }
+
+        visual.mesh.geometry.dispose();
+
+        if (visual.edges) {
+
+          visual.edges.geometry.dispose();
+        }
+
+        if (visual.normal) {
+
+          visual.normal.geometry.dispose();
+        }
+
+        if (visual.center) {
+
+          visual.center.geometry.dispose();
+        }
+      }
+
+
+      const mesh =
+              buildPlaneObject(
+                      plane,
+                      pose,
+                      data
+              );
+
+      const edges =
+              CONFIG.showPlaneEdges
+                      ? buildPlaneEdges(
+                              plane,
+                              pose
+                      )
+                      : null;
+
+      const normal =
+              CONFIG.showPlaneNormals
+                      ? buildNormal(
+                              plane,
+                              pose
+                      )
+                      : null;
+
+      const center =
+              CONFIG.showPlaneCenters
+                      ? buildCenter(
+                              pose
+                      )
+                      : null;
+
+
+      if (mesh && CONFIG.showPlanes) {
+
+        if (
+                data.classification ===
+                "floor"
+        ) {
+
+          mesh.material.color
+                  .setHex(0x00ff00);
+
+          mesh.material.opacity =
+                  0.22;
+        }
+        else if (
+                data.classification ===
+                "wall"
+        ) {
+
+          mesh.material.color
+                  .setHex(0x0088ff);
+
+          mesh.material.opacity =
+                  0.18;
+        }
+        else {
+
+          mesh.material.color
+                  .setHex(0xffff00);
+
+          mesh.material.opacity =
+                  0.12;
+        }
+
+        planeGroup.add(mesh);
+      }
+
+      if (edges) {
+
+        planeGroup.add(edges);
+      }
+
+      if (normal) {
+
+        normalGroup.add(normal);
+      }
+
+      if (center) {
+
+        centerGroup.add(center);
+      }
+
+      planeObjects.set(
+              id,
+              {
+                mesh,
+                edges,
+                normal,
+                center
+              }
+      );
+    }
+
+
+    /*
+     * Detect removed planes.
+     */
+
+    for (
+            const [id, visual]
+            of planeObjects
+            ) {
+
+      if (
+              !currentlyVisible.has(id)
+      ) {
+
+        spatialMap.planesRemoved++;
+
+        planeGroup.remove(
+                visual.mesh
+        );
+
+        if (visual.edges) {
+
+          planeGroup.remove(
+                  visual.edges
+          );
+        }
+
+        if (visual.normal) {
+
+          normalGroup.remove(
+                  visual.normal
+          );
+        }
+
+        if (visual.center) {
+
+          centerGroup.remove(
+                  visual.center
+          );
+        }
+
+        visual.mesh.geometry.dispose();
+
+        if (visual.edges) {
+
+          visual.edges.geometry.dispose();
+        }
+
+        if (visual.normal) {
+
+          visual.normal.geometry.dispose();
+        }
+
+        if (visual.center) {
+
+          visual.center.geometry.dispose();
+        }
+
+        planeObjects.delete(id);
+
+        delete spatialMap.planes[id];
+      }
+    }
+  }
+
+
+  /* ============================================================
+     PLANE ID
+     ============================================================ */
+
+  const planeIds =
+          new WeakMap();
+
+  let nextPlaneId = 1;
+
+
+  function getPlaneId(plane) {
+
+    if (!planeIds.has(plane)) {
+
+      planeIds.set(
+              plane,
+              `plane-${nextPlaneId++}`
+      );
+    }
+
+    return planeIds.get(plane);
+  }
+
+
+  /* ============================================================
+     POLYGON BOUNDS
+     ============================================================ */
+
+  function getPolygonBounds(points) {
+
+    if (!points || !points.length) {
+
+      return {
+        width: 0,
+        height: 0
+      };
+    }
+
+    let minX = Infinity;
+    let maxX = -Infinity;
+
+    let minZ = Infinity;
+    let maxZ = -Infinity;
+
+    for (const p of points) {
+
+      minX =
+              Math.min(minX, p.x);
+
+      maxX =
+              Math.max(maxX, p.x);
+
+      minZ =
+              Math.min(minZ, p.z);
+
+      maxZ =
+              Math.max(maxZ, p.z);
+    }
+
+    return {
+
+      width:
+              maxX - minX,
+
+      height:
+              maxZ - minZ
+    };
+  }
+
+
+  /* ============================================================
+     FLOOR GRID
+     ============================================================ */
+
+  function rebuildFloorGrid() {
+
+    floorGridGroup.clear();
+
+    if (!CONFIG.showFloorGrid) {
+
+      return;
+    }
+
+    const floors =
+            Object.values(
+                    spatialMap.planes
+            ).filter(
+                    p =>
+                            p.classification ===
+                            "floor"
+            );
+
+    if (!floors.length) {
+
+      return;
+    }
+
+    const floor =
+            floors[0];
+
+    const size =
+            CONFIG.floorGridSize;
+
+    const step =
+            CONFIG.floorGridStep;
+
+    const vertices = [];
+
+    for (
+            let x = -size;
+            x <= size;
+            x += step
+    ) {
+
+      vertices.push(
+              x,
+              0,
+              -size,
+
+              x,
+              0,
+              size
+      );
+    }
+
+    for (
+            let z = -size;
+            z <= size;
+            z += step
+    ) {
+
+      vertices.push(
+              -size,
+              0,
+              z,
+
+              size,
+              0,
+              z
+      );
+    }
+
+    const geometry =
+            new THREE.BufferGeometry();
+
+    geometry.setAttribute(
+            "position",
+            new THREE.Float32BufferAttribute(
+                    vertices,
+                    3
+            )
+    );
+
+    const material =
+            new THREE.LineBasicMaterial({
+
+              color: 0x555555,
+
+              transparent: true,
+
+              opacity: 0.35
+            });
+
+    const grid =
+            new THREE.LineSegments(
+                    geometry,
+                    material
+            );
+
+    grid.position.set(
+            floor.center.x,
+            floor.center.y + 0.002,
+            floor.center.z
+    );
+
+    floorGridGroup.add(grid);
+  }
+
+
+  /* ============================================================
+     DEPTH SCANNING
+     ============================================================ */
+
+  function collectDepth(frame) {
+
+    if (!CONFIG.collectDepthPoints) {
+
+      return;
+    }
+
+    const session =
+            renderer.xr.getSession();
+
+    if (!session) {
+
+      return;
+    }
+
+    if (
+            session.depthUsage !==
+            "cpu-optimized"
+    ) {
+
+      return;
+    }
+
+    const viewerPose =
+            frame.getViewerPose(
+                    renderer.xr.getReferenceSpace()
+            );
+
+    if (!viewerPose) {
+
+      return;
+    }
+
+    if (
+            typeof frame.getDepthInformation !==
+            "function"
+    ) {
+
+      return;
+    }
+
+    /*
+     * For AR phone mode normally there is
+     * one relevant view.
+     */
+
+    for (const view of viewerPose.views) {
+
+      let depthInfo = null;
+
+      try {
+
+        depthInfo =
+                frame.getDepthInformation(
+                        view
+                );
+
+      }
+      catch (error) {
+
+        console.warn(
+                "Depth information error:",
+                error
+        );
+
+        continue;
+      }
+
+      if (!depthInfo) {
+
+        continue;
+      }
+
+      spatialMap.depthFrames++;
+
+      /*
+       * Sampling normalized view coordinates.
+       */
+
+      const step =
+              CONFIG.depthSampleStep;
+
+      for (
+              let py = 0;
+              py <= 1;
+              py += step /
+                      Math.max(
+                              depthInfo.height,
+                              1
+                      )
+      ) {
+
+        for (
+                let px = 0;
+                px <= 1;
+                px += step /
+                        Math.max(
+                                depthInfo.width,
+                                1
+                        )
+        ) {
+
+          let depth;
+
+          try {
+
+            depth =
+                    depthInfo.getDepthInMeters(
+                            px,
+                            py
+                    );
+
+          }
+          catch {
+
+            continue;
+          }
+
+          if (
+                  !Number.isFinite(depth) ||
+                  depth <= 0 ||
+                  depth > 20
+          ) {
+
+            continue;
+          }
+
+          /*
+           * We store the depth sample.
+           *
+           * Full world reconstruction from
+           * arbitrary camera pixels requires
+           * the view projection/inverse
+           * transform and the depth-buffer
+           * coordinate transform.
+           *
+           * Keep the raw normalized sample
+           * here as well so diagnostics remain
+           * useful on devices where the exact
+           * projection data differs.
+           */
+
+          spatialMap.points.push({
+
+            x: px,
+
+            y: py,
+
+            z: depth,
+
+            view: view.eye || "unknown"
+          });
+
+          if (
+                  spatialMap.points.length >
+                  CONFIG.maxDepthPoints
+          ) {
+
+            spatialMap.points.shift();
+          }
+        }
+      }
+    }
+  }
+
+
+  /* ============================================================
+     DEPTH POINT VISUALIZATION
+     ============================================================ */
+
+  function updateDepthVisualisation() {
+
+    /*
+     * Depth samples are kept as diagnostic data.
+     *
+     * Do not turn every depth sample into a
+     * world-space THREE.Points object here.
+     *
+     * The WebXR depth coordinate transform
+     * must be applied before interpreting
+     * normalized image coordinates as world
+     * coordinates.
+     */
+
+    return;
+  }
+
+
+  /* ============================================================
+     HIT TEST
+     ============================================================ */
+
+  let hitTestSource = null;
+
+
+  async function initializeHitTest(session) {
+
+    if (!session) {
+
+      return;
+    }
+
+    if (
+            !session.requestReferenceSpace
+    ) {
+
+      return;
+    }
+
+    try {
+
+      const viewerSpace =
+              await session.requestReferenceSpace(
+                      "viewer"
+              );
+
+      hitTestSource =
+              await session.requestHitTestSource({
+                space: viewerSpace
+              });
+
+      session.addEventListener(
+              "end",
+              () => {
+
+                hitTestSource = null;
+              }
+      );
+
+    }
+    catch (error) {
+
+      console.warn(
+              "Hit test unavailable:",
+              error
+      );
+    }
+  }
+
+
+  /* ============================================================
+     HIT TEST UPDATE
+     ============================================================ */
+
+  function updateHitTest(frame) {
+
+    if (!hitTestSource) {
+
+      return;
+    }
+
+    const referenceSpace =
+            renderer.xr.getReferenceSpace();
+
+    if (!referenceSpace) {
+
+      return;
+    }
+
+    let results = [];
+
+    try {
+
+      results =
+              frame.getHitTestResults(
+                      hitTestSource
+              );
+
+    }
+    catch {
+
+      return;
+    }
+
+    if (!results.length) {
+
+      spatialMap.hitTest = null;
+
+      return;
+    }
+
+    const result =
+            results[0];
+
+    const pose =
+            result.getPose(
+                    referenceSpace
+            );
+
+    if (!pose) {
+
+      return;
+    }
+
+    const position =
+            new THREE.Vector3(
+                    pose.transform.position.x,
+                    pose.transform.position.y,
+                    pose.transform.position.z
+            );
+
+    const cameraPosition =
+            new THREE.Vector3(
+                    spatialMap.camera.position.x,
+                    spatialMap.camera.position.y,
+                    spatialMap.camera.position.z
+            );
+
+    spatialMap.hitTests++;
+
+    spatialMap.hitTest = {
+
+      position: {
+
+        x: position.x,
+        y: position.y,
+        z: position.z
+      },
+
+      distance:
+              position.distanceTo(
+                      cameraPosition
+              )
+    };
+  }
+
+
+  /* ============================================================
+     CAMERA DATA
+     ============================================================ */
+
+  function updateCameraInfo() {
+
+    const xrCamera =
+            renderer.xr.getCamera();
+
+    const position =
+            new THREE.Vector3();
+
+    const quaternion =
+            new THREE.Quaternion();
+
+    xrCamera.getWorldPosition(
+            position
+    );
+
+    xrCamera.getWorldQuaternion(
+            quaternion
+    );
+
+    spatialMap.camera.position = {
+
+      x: position.x,
+      y: position.y,
+      z: position.z
+    };
+
+    spatialMap.camera.quaternion = {
+
+      x: quaternion.x,
+      y: quaternion.y,
+      z: quaternion.z,
+      w: quaternion.w
+    };
+  }
+
+
+  /* ============================================================
+     XR SESSION
+     ============================================================ */
+
+  async function onSessionStarted(session) {
+
+    spatialMap.startedAt =
+            new Date().toISOString();
+
+    await initializeHitTest(
+            session
+    );
+
+    session.addEventListener(
+            "end",
+            onSessionEnded
+    );
+
+    console.log(
+            "XR SESSION STARTED",
+            session
+    );
+
+    console.log(
+            "environmentBlendMode:",
+            session.environmentBlendMode
+    );
+
+    console.log(
+            "depthUsage:",
+            session.depthUsage
+    );
+
+    console.log(
+            "depthDataFormat:",
+            session.depthDataFormat
+    );
+
+    updateDebug();
+  }
+
+
+  function onSessionEnded() {
+
+    hitTestSource = null;
+
+    console.log(
+            "XR SESSION ENDED"
+    );
+
+    updateDebug();
+  }
+
+
+  /* ============================================================
+     AR BUTTON
+     ============================================================ */
+
+  const sessionInit = {
+
+    requiredFeatures: [
+      "local-floor",
+      "plane-detection"
+    ],
+
+    optionalFeatures: [
+      "hit-test",
+      "depth-sensing",
+      "dom-overlay"
+    ],
+
+    domOverlay: {
+      root: document.body
+    },
+
+    depthSensing: {
+
+      usagePreference: [
+        "cpu-optimized",
+        "gpu-optimized"
+      ],
+
+      dataFormatPreference: [
+        "luminance-alpha",
+        "float32"
+      ]
+    }
+  };
+
+
+  const arButton =
+          ARButton.createButton(
+                  renderer,
+                  sessionInit
+          );
+
+  document.body.appendChild(
+          arButton
+  );
+
+
+  /* ============================================================
+     SESSION WATCH
+     ============================================================ */
+
+  let previousSession = null;
+
+
+  function checkSession() {
+
+    const session =
+            renderer.xr.getSession();
+
+    if (
+            session &&
+            session !== previousSession
+    ) {
+
+      previousSession =
+              session;
+
+      onSessionStarted(
+              session
+      );
+    }
+
+    if (
+            !session &&
+            previousSession
+    ) {
+
+      previousSession = null;
+
+      onSessionEnded();
+    }
+  }
+
+
+  /* ============================================================
+     ANIMATION
+     ============================================================ */
+
+  renderer.setAnimationLoop(
+          function () {
+
+            spatialMap.frames++;
+
+            checkSession();
+
+            const frame =
+                    renderer.xr.getFrame();
+
+            if (frame) {
+
+              try {
+
+                updatePlanes(frame);
+
+              }
+              catch (error) {
+
+                console.error(
+                        "Plane update error:",
+                        error
+                );
+              }
+
+              try {
+
+                updateHitTest(frame);
+
+              }
+              catch (error) {
+
+                console.error(
+                        "Hit test error:",
+                        error
+                );
+              }
+
+              try {
+
+                collectDepth(frame);
+
+              }
+              catch (error) {
+
+                console.error(
+                        "Depth error:",
+                        error
+                );
+              }
+            }
+
+            updateCameraInfo();
+
+            /*
+             * Rebuild floor grid when
+             * floor information becomes available.
+             */
+
+            if (
+                    spatialMap.frames % 30 === 0
+            ) {
+
+              rebuildFloorGrid();
+
+              updateDepthVisualisation();
+
+              updateDebug();
+            }
+
+            renderer.render(
+                    scene,
+                    camera
+            );
+          }
+  );
+
+
+  /* ============================================================
+     EXPORT
+     ============================================================ */
+
+  function buildExportObject() {
+
+    return {
+
+      version: 1,
+
+      type: "webxr-spatial-map",
+
+      generatedAt:
+              new Date().toISOString(),
+
+      startedAt:
+      spatialMap.startedAt,
+
+      statistics: {
+
+        frames:
+        spatialMap.frames,
+
+        planes:
+        Object.keys(
+                spatialMap.planes
+        ).length,
+
+        depthFrames:
+        spatialMap.depthFrames,
+
+        depthPoints:
+        spatialMap.points.length,
+
+        hitTests:
+        spatialMap.hitTests
+      },
+
+      camera:
+      spatialMap.camera,
+
+      planes:
+              Object.values(
+                      spatialMap.planes
+              ),
+
+      depthSamples:
+      spatialMap.points,
+
+      hitTest:
+      spatialMap.hitTest
+    };
+  }
+
+
+  document
+          .getElementById("jsonButton")
+          .addEventListener(
+                  "click",
+                  () => {
+
+                    const data =
+                            buildExportObject();
+
+                    const json =
+                            JSON.stringify(
+                                    data,
+                                    null,
+                                    2
+                            );
+
+                    console.log(
+                            "SPATIAL MAP:",
+                            data
+                    );
+
+                    /*
+                     * On mobile this opens the generated
+                     * JSON instead of relying on a broken
+                     * download mechanism.
+                     */
+
+                    const blob =
+                            new Blob(
+                                    [json],
+                                    {
+                                      type:
+                                              "application/json"
+                                    }
+                            );
+
+                    const url =
+                            URL.createObjectURL(
+                                    blob
+                            );
+
+                    const a =
+                            document.createElement(
+                                    "a"
+                            );
+
+                    a.href = url;
+
+                    a.download =
+                            "spatial-map.json";
+
+                    a.click();
+
+                    setTimeout(
+                            () => {
+                              URL.revokeObjectURL(url);
+                            },
+                            1000
+                    );
+                  }
+          );
+
+
+  /* ============================================================
+     RESIZE
+     ============================================================ */
+
+  window.addEventListener(
+          "resize",
+          () => {
+
+            camera.aspect =
+                    window.innerWidth /
+                    window.innerHeight;
+
+            camera.updateProjectionMatrix();
+
+            renderer.setSize(
+                    window.innerWidth,
+                    window.innerHeight
+            );
+          }
+  );
+
+
+  /* ============================================================
+     INITIAL DIAGNOSTICS
+     ============================================================ */
+
+  async function checkWebXR() {
+
+    if (!navigator.xr) {
+
+      debugElement.innerHTML = `
+            <div class="error">
+                WebXR is not available.
+            </div>
+
+            <div>
+                navigator.xr = undefined
+            </div>
+
+            <div>
+                Use a compatible mobile/headset browser
+                over HTTPS.
+            </div>
+        `;
+
+      return;
+    }
+
+    let arSupported = false;
+
+    try {
+
+      arSupported =
+              await navigator.xr.isSessionSupported(
+                      "immersive-ar"
+              );
+
+    }
+    catch (error) {
+
+      console.error(error);
+    }
+
+    debugElement.innerHTML = `
+
+        <div class="${
+            arSupported
+                    ? "ok"
+                    : "warning"
+    }">
+
+            immersive-ar:
+            ${arSupported}
+
+        </div>
+
+        <div class="section">
+            FEATURES REQUESTED
+        </div>
+
+        local-floor
+        <br>
+        plane-detection
+        <br>
+        hit-test
+        <br>
+        depth-sensing
+
+        <div class="section">
+            START AR
+        </div>
+
+        Press the AR button and slowly scan
+        the room with the camera.
+
+    `;
+  }
+
+
+  checkWebXR();
+
+
+  /* ============================================================
+     GLOBAL DEBUG ACCESS
+     ============================================================ */
+
+  window.spatialMap =
+          spatialMap;
+
+  window.exportSpatialMap =
+          buildExportObject;
+
+
+  /* ============================================================
+     LOG
+     ============================================================ */
+
+  console.log(
+          "%cWebXR Spatial Scanner",
+          "font-size:20px;font-weight:bold"
+  );
+
+  console.log(
+          "Spatial map is available as:",
+          "window.spatialMap"
+  );
+
+  console.log(
+          "Export function:",
+          "window.exportSpatialMap()"
+  );
+
+</script>
+
 </body>
 </html>
