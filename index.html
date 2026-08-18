@@ -47,9 +47,8 @@
 
       box-sizing: border-box;
 
-      padding: 12px 14px;
-
-      overflow: auto;
+      display: flex;
+      flex-direction: column;
 
       color: #b9ffb9;
       background: rgba(0, 0, 0, 0.78);
@@ -62,18 +61,123 @@
 
       z-index: 1000;
 
-      pointer-events: none;
+      pointer-events: auto;
 
       white-space: normal;
+
+      transition: transform 0.25s ease, opacity 0.2s ease;
+    }
+
+    #debug.collapsed {
+      transform: translateX(calc(-100% + 28px));
+    }
+
+    #debug .debug-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+
+      flex-shrink: 0;
+
+      padding: 10px 12px 8px 14px;
+
+      border-bottom: 1px solid rgba(255,255,255,0.12);
+
+      cursor: default;
     }
 
     #debug .title {
-      margin-bottom: 8px;
+      margin: 0;
 
       color: #ffffff;
 
       font-size: 15px;
       font-weight: 700;
+    }
+
+    #debugToggle {
+      flex-shrink: 0;
+
+      width: 28px;
+      height: 28px;
+
+      padding: 0;
+
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 4px;
+
+      color: #fff;
+      background: rgba(255,255,255,0.12);
+
+      font-size: 14px;
+      line-height: 1;
+
+      cursor: pointer;
+
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #debugToggle:active {
+      background: rgba(255,255,255,0.25);
+    }
+
+    #debugContent {
+      flex: 1 1 auto;
+
+      min-height: 0;
+
+      padding: 10px 14px 12px;
+
+      overflow-x: hidden;
+      overflow-y: auto;
+
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* Ушко, когда панель свёрнута */
+    #debugEar {
+      display: none;
+
+      position: absolute;
+      top: 12px;
+      right: 0;
+
+      width: 28px;
+      height: 56px;
+
+      box-sizing: border-box;
+
+      padding: 0;
+
+      border: 1px solid rgba(255,255,255,0.25);
+      border-left: none;
+      border-radius: 0 6px 6px 0;
+
+      color: #b9ffb9;
+      background: rgba(0, 0, 0, 0.85);
+
+      font-size: 16px;
+      line-height: 1;
+
+      cursor: pointer;
+
+      z-index: 1001;
+
+      align-items: center;
+      justify-content: center;
+    }
+
+    #debug.collapsed #debugEar {
+      display: flex;
+    }
+
+    #debug.collapsed .debug-header,
+    #debug.collapsed #debugContent {
+      visibility: hidden;
+      pointer-events: none;
     }
 
     #debug .section {
@@ -158,13 +262,22 @@
 <body>
 
 <div id="debug">
-  <div class="title">
-    WEBXR SPATIAL SCANNER
+  <div class="debug-header">
+    <div class="title">
+      WEBXR SPATIAL SCANNER
+    </div>
+    <button id="debugToggle" type="button" title="Свернуть лог" aria-label="Свернуть лог">
+      ◀
+    </button>
   </div>
 
   <div id="debugContent">
     Checking WebXR...
   </div>
+
+  <button id="debugEar" type="button" title="Развернуть лог" aria-label="Развернуть лог">
+    ▶
+  </button>
 </div>
 
 <div id="buttons">
@@ -3935,6 +4048,93 @@
             );
           }
   );
+
+
+  /* ============================================================
+     DEBUG PANEL TOGGLE (сворачивание с ушком)
+     ============================================================ */
+
+  const debugPanel =
+          document.getElementById("debug");
+
+  const debugToggleBtn =
+          document.getElementById("debugToggle");
+
+  const debugEarBtn =
+          document.getElementById("debugEar");
+
+
+  function setDebugCollapsed(collapsed) {
+
+    if (!debugPanel) {
+      return;
+    }
+
+    debugPanel.classList.toggle(
+            "collapsed",
+            collapsed
+    );
+
+    if (debugToggleBtn) {
+
+      debugToggleBtn.textContent =
+              collapsed ? "▶" : "◀";
+
+      debugToggleBtn.title =
+              collapsed
+                      ? "Развернуть лог"
+                      : "Свернуть лог";
+
+      debugToggleBtn.setAttribute(
+              "aria-label",
+              debugToggleBtn.title
+      );
+    }
+  }
+
+
+  function toggleDebugPanel() {
+
+    if (!debugPanel) {
+      return;
+    }
+
+    setDebugCollapsed(
+            !debugPanel.classList.contains(
+                    "collapsed"
+            )
+    );
+  }
+
+
+  if (debugToggleBtn) {
+
+    debugToggleBtn.addEventListener(
+            "click",
+            (event) => {
+
+              event.preventDefault();
+              event.stopPropagation();
+
+              toggleDebugPanel();
+            }
+    );
+  }
+
+
+  if (debugEarBtn) {
+
+    debugEarBtn.addEventListener(
+            "click",
+            (event) => {
+
+              event.preventDefault();
+              event.stopPropagation();
+
+              setDebugCollapsed(false);
+            }
+    );
+  }
 
 
   /* ============================================================
